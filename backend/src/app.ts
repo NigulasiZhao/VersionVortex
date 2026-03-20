@@ -4,6 +4,7 @@ import path from 'path';
 import { initDb } from './db/index';
 import publicRoutes from './routes/public';
 import adminRoutes from './routes/admin';
+import jenkinsRoutes from './routes/jenkins';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -18,6 +19,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 // API routes (after DB is initialized)
 app.use('/api', publicRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin', jenkinsRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

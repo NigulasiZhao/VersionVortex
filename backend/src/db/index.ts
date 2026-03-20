@@ -134,6 +134,18 @@ export async function initDb() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS jenkins_configs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      package_id INTEGER UNIQUE NOT NULL,
+      jenkins_url TEXT NOT NULL,
+      job_name TEXT NOT NULL,
+      username TEXT NOT NULL,
+      api_token TEXT NOT NULL,
+      artifact_pattern TEXT NOT NULL DEFAULT '*.zip',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
+    );
   `);
 
   // Seed default admin

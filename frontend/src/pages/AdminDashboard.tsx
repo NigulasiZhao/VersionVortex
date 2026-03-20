@@ -10,8 +10,15 @@ import {
   getAdminUsers,
   createUser,
   deleteUser,
+  getJenkinsConfigs,
+  saveJenkinsConfig,
+  deleteJenkinsConfig,
+  triggerAllJenkinsBuilds,
+  getJenkinsBuildSession,
+  getAdminReleases as reloadReleases,
+  getAdminStats as reloadStats,
 } from '../services/api';
-import type { Release, Package, AdminStats, User } from '../types';
+import type { Release, Package, AdminStats, User, JenkinsConfig, BuildSession } from '../types';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('zh-CN', {
@@ -26,22 +33,39 @@ export default function AdminDashboard() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [jenkinsConfigs, setJenkinsConfigs] = useState<Record<number, JenkinsConfig>>({});
   const [tab, setTab] = useState<'releases' | 'packages' | 'users'>('releases');
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
 
+  // 一键发版状态
+  const [buildSession, setBuildSession] = useState<BuildSession | null>(null);
+  const [buildLoading, setBuildLoading] = useState(false);
+  const [buildError, setBuildError] = useState('');
+  const [jenkinsConfigModal, setJenkinsConfigModal] = useState<{ open: boolean; pkg: Package | null }>({ open: false, pkg: null });
+
   const load = () => {
-    Promise.all([getAdminReleases(), getAdminPackages(), getAdminStats(), getAdminUsers()])
-      .then(([r, p, s, u]) => {
+    Promise.all([getAdminReleases(), getAdminPackages(), getAdminStats(), getAdminUsers(), getJenkinsConfigs()])
+      .then(([r, p, s, u, jc]) => {
         setReleases(r);
         setPackages(p);
         setStats(s);
         setUsers(u);
+        const configMap: Record<number, JenkinsConfig> = {};
+        (jc as JenkinsConfig[]).forEach((c) => { configMap[c.package_id] = c; });
+        setJenkinsConfigs(configMap);
       })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
+
+  const refreshData = () => {
+    Promise.all([reloadReleases(), reloadStats()]).then(([r, s]) => {
+      setReleases(r);
+      setStats(s);
+    });
+  };
 
   const handleDeleteRelease = async (id: number) => {
     if (!confirm('确定要删除此版本吗？此操作不可撤销。')) return;
@@ -80,6 +104,50 @@ export default function AdminDashboard() {
     } finally {
       setDeleting(null);
     }
+  };
+
+  // 一键发版
+  const handleOneClickRelease = async () => {
+    setBuildError('');
+    setBuildLoading(true);
+    try {
+      const result = await triggerAllJenkinsBuilds();
+      setBuildSession({
+        id: result.session_id,
+        tag_name: result.tag_name,
+        created_at: new Date().toISOString(),
+        packages: [], // Will be populated by polling
+        overall_status: 'running',
+        release_id: null,
+      });
+      // Start polling
+      pollBuildSession(result.session_id);
+    } catch (err: any) {
+      setBuildError(err.response?.data?.error || err.message);
+      setBuildLoading(false);
+    }
+  };
+
+  const pollBuildSession = (sessionId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const session = await getJenkinsBuildSession(sessionId);
+        setBuildSession(session);
+        if (session.overall_status !== 'running') {
+          clearInterval(interval);
+          setBuildLoading(false);
+          // Refresh data when done
+          if (session.overall_status === 'completed') {
+            load();
+          }
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, 3000);
+
+    // Auto-stop after 10 minutes
+    setTimeout(() => { clearInterval(interval); setBuildLoading(false); }, 600000);
   };
 
   if (loading) {
@@ -128,12 +196,25 @@ export default function AdminDashboard() {
             ))}
           </div>
           {tab === 'releases' && (
-            <Link
-              to="/admin/releases/new"
-              className="text-xs px-4 py-2 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white transition-colors no-underline"
-            >
-              + 新建版本
-            </Link>
+            <div className="flex gap-2">
+              <button
+                onClick={handleOneClickRelease}
+                disabled={buildLoading || Object.keys(jenkinsConfigs).length === 0}
+                className="text-xs px-4 py-2 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white transition-colors no-underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {buildLoading ? (
+                  <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />构建中...</>
+                ) : (
+                  <>🚀 一键发版</>
+                )}
+              </button>
+              <Link
+                to="/admin/releases/new"
+                className="text-xs px-4 py-2 rounded-lg border border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all no-underline"
+              >
+                + 新建版本
+              </Link>
+            </div>
           )}
           {tab === 'packages' && (
             <PackageModal onAdded={(pkg) => setPackages((prev) => [...prev, pkg])} />
@@ -151,8 +232,10 @@ export default function AdminDashboard() {
           ) : tab === 'packages' ? (
             <PackagesTable
               packages={packages}
+              jenkinsConfigs={jenkinsConfigs}
               onDelete={handleDeletePackage}
               deleting={deleting}
+              onConfigJenkins={(pkg) => setJenkinsConfigModal({ open: true, pkg })}
             />
           ) : (
             <UsersTable
@@ -163,6 +246,127 @@ export default function AdminDashboard() {
             />
           )}
         </div>
+
+        {/* 一键发版进度弹窗 */}
+        {(buildSession || buildError || buildLoading) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+            <div className="w-full max-w-lg border border-[var(--color-border-default)] rounded-xl" style={{ background: 'var(--color-canvas-subtle)' }}>
+              <div className="px-5 py-4 border-b border-[var(--color-border-default)] flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">一键发版</h3>
+                  {buildSession && (
+                    <p className="text-xs text-[var(--color-fg-muted)] mt-0.5">
+                      版本号: <span className="font-mono text-[var(--color-accent-fg)]">{buildSession.tag_name}</span>
+                      · {buildSession.packages.length} 个软件包
+                    </p>
+                  )}
+                </div>
+                {(!buildLoading || buildSession?.overall_status !== 'running') && (
+                  <button onClick={() => { setBuildSession(null); setBuildError(''); }} className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                  </button>
+                )}
+              </div>
+              <div className="p-5 space-y-3">
+                {buildError && (
+                  <div className="text-sm text-[var(--color-danger-fg)] bg-[rgba(248,81,73,0.1)] border border-[rgba(248,81,73,0.3)] rounded-lg px-4 py-3">
+                    {buildError}
+                  </div>
+                )}
+                {buildLoading && !buildSession && (
+                  <div className="flex items-center gap-3 py-4">
+                    <div className="animate-spin w-6 h-6 border-2 border-[var(--color-accent-emphasis)] border-t-transparent rounded-full" />
+                    <span className="text-sm text-[var(--color-fg-muted)]">正在启动发版任务...</span>
+                  </div>
+                )}
+                {buildSession && (
+                  <div className="space-y-2">
+                    {buildSession.packages.map((pkg, idx) => (
+                      <div key={idx} className="border border-[var(--color-border-default)] rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-[var(--color-fg-default)]">{pkg.package_name}</span>
+                            {pkg.build_number && (
+                              <span className="text-xs text-[var(--color-fg-muted)] font-mono">#${pkg.build_number}</span>
+                            )}
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            pkg.status === 'completed' ? 'bg-[rgba(63,185,80,0.15)] text-[var(--color-success-fg)]' :
+                            pkg.status === 'failed' ? 'bg-[rgba(248,81,73,0.15)] text-[var(--color-danger-fg)]' :
+                            pkg.status === 'downloading' ? 'bg-[rgba(59,130,246,0.15)] text-[#3b82f6]' :
+                            'bg-[rgba(110,118,129,0.15)] text-[var(--color-fg-muted)]'
+                          }`}>
+                            {pkg.status === 'pending' && '等待中'}
+                            {pkg.status === 'triggering' && '触发中'}
+                            {pkg.status === 'building' && '构建中'}
+                            {pkg.status === 'downloading' && '下载产物'}
+                            {pkg.status === 'completed' && '完成'}
+                            {pkg.status === 'failed' && '失败'}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full h-1.5 rounded-full bg-[var(--color-canvas-default)] mb-1 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              pkg.status === 'failed' ? 'bg-[var(--color-danger-fg)]' :
+                              pkg.status === 'completed' ? 'bg-[var(--color-success-fg)]' :
+                              'bg-[var(--color-accent-emphasis)]'
+                            }`}
+                            style={{ width: `${pkg.progress}%` }}
+                          />
+                        </div>
+                        {pkg.error && (
+                          <p className="text-xs text-[var(--color-danger-fg)]">{pkg.error}</p>
+                        )}
+                        {pkg.artifact_name && pkg.status === 'completed' && (
+                          <p className="text-xs text-[var(--color-fg-muted)]">
+                            📦 {pkg.artifact_name}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    {buildSession.overall_status !== 'running' && (
+                      <div className={`text-sm text-center py-2 rounded-lg ${
+                        buildSession.overall_status === 'completed'
+                          ? 'text-[var(--color-success-fg)]'
+                          : 'text-[var(--color-danger-fg)]'
+                      }`}>
+                        {buildSession.overall_status === 'completed'
+                          ? `✅ 全部发版完成，共 ${buildSession.packages.length} 个包`
+                          : '⚠️ 发版结束，部分包可能失败'}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {(!buildLoading || buildSession?.overall_status !== 'running') && (
+                  <button
+                    onClick={() => { setBuildSession(null); setBuildError(''); }}
+                    className="w-full py-2 text-sm border border-[var(--color-border-default)] rounded-lg text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all"
+                  >
+                    关闭
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Jenkins 配置弹窗 */}
+        {jenkinsConfigModal.open && jenkinsConfigModal.pkg && (
+          <JenkinsConfigModal
+            pkg={jenkinsConfigModal.pkg}
+            existingConfig={jenkinsConfigs[jenkinsConfigModal.pkg.id]}
+            onSaved={(config) => {
+              setJenkinsConfigs((prev) => ({ ...prev, [config.package_id]: config }));
+              setJenkinsConfigModal({ open: false, pkg: null });
+            }}
+            onDeleted={(pkgId) => {
+              setJenkinsConfigs((prev) => { const next = { ...prev }; delete next[pkgId]; return next; });
+              setJenkinsConfigModal({ open: false, pkg: null });
+            }}
+            onClose={() => setJenkinsConfigModal({ open: false, pkg: null })}
+          />
+        )}
       </div>
     </div>
   );
@@ -238,10 +442,12 @@ function ReleasesTable({ releases, onDelete, deleting }: {
   );
 }
 
-function PackagesTable({ packages, onDelete, deleting }: {
+function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJenkins }: {
   packages: Package[];
+  jenkinsConfigs: Record<number, JenkinsConfig>;
   onDelete: (id: number) => void;
   deleting: number | null;
+  onConfigJenkins: (pkg: Package) => void;
 }) {
   if (packages.length === 0) {
     return (
@@ -268,13 +474,25 @@ function PackagesTable({ packages, onDelete, deleting }: {
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{pkg.description || '-'}</td>
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatDate(pkg.created_at)}</td>
             <td className="px-4 py-3 text-right">
-              <button
-                onClick={() => onDelete(pkg.id)}
-                disabled={deleting === pkg.id}
-                className="text-xs px-3 py-1 rounded-md border border-[var(--color-border-default)] text-[var(--color-danger-fg)] hover:border-[var(--color-danger-fg)] transition-all disabled:opacity-50"
-              >
-                {deleting === pkg.id ? '删除中' : '删除'}
-              </button>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => onConfigJenkins(pkg)}
+                  className={`text-xs px-3 py-1 rounded-md border transition-all ${
+                    jenkinsConfigs[pkg.id]
+                      ? 'border-[var(--color-success-fg)] text-[var(--color-success-fg)] hover:bg-[rgba(63,185,80,0.1)]'
+                      : 'border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)]'
+                  }`}
+                >
+                  {jenkinsConfigs[pkg.id] ? '⚙️ 已配置' : '⚙️ 配置发版'}
+                </button>
+                <button
+                  onClick={() => onDelete(pkg.id)}
+                  disabled={deleting === pkg.id}
+                  className="text-xs px-3 py-1 rounded-md border border-[var(--color-border-default)] text-[var(--color-danger-fg)] hover:border-[var(--color-danger-fg)] transition-all disabled:opacity-50"
+                >
+                  {deleting === pkg.id ? '删除中' : '删除'}
+                </button>
+              </div>
             </td>
           </tr>
         ))}
@@ -507,5 +725,152 @@ function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
         </div>
       )}
     </>
+  );
+}
+
+function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }: {
+  pkg: Package;
+  existingConfig?: JenkinsConfig;
+  onSaved: (config: JenkinsConfig) => void;
+  onDeleted: (pkgId: number) => void;
+  onClose: () => void;
+}) {
+  const [jenkinsUrl, setJenkinsUrl] = useState(existingConfig?.jenkins_url || '');
+  const [jobName, setJobName] = useState(existingConfig?.job_name || '');
+  const [username, setUsername] = useState(existingConfig?.username || '');
+  const [apiToken, setApiToken] = useState(existingConfig?.api_token || '');
+  const [artifactPattern, setArtifactPattern] = useState(existingConfig?.artifact_pattern || '*.zip');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const config = await saveJenkinsConfig({
+        package_id: pkg.id,
+        jenkins_url: jenkinsUrl,
+        job_name: jobName,
+        username,
+        api_token: apiToken,
+        artifact_pattern: artifactPattern,
+      });
+      onSaved(config);
+    } catch (err: any) {
+      setError(err.response?.data?.error || '保存失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await deleteJenkinsConfig(pkg.id);
+      onDeleted(pkg.id);
+    } catch (err: any) {
+      setError(err.response?.data?.error || '删除失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+      <div className="w-full max-w-md border border-[var(--color-border-default)] rounded-xl" style={{ background: 'var(--color-canvas-subtle)' }}>
+        <div className="px-5 py-4 border-b border-[var(--color-border-default)] flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">配置 Jenkins 发版</h3>
+            <p className="text-xs text-[var(--color-fg-muted)] mt-0.5">{pkg.name}</p>
+          </div>
+          <button onClick={onClose} className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm text-[var(--color-fg-default)] mb-1">Jenkins 地址 *</label>
+            <input
+              value={jenkinsUrl}
+              onChange={(e) => setJenkinsUrl(e.target.value)}
+              required
+              placeholder="https://jenkins.example.com"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              style={{ background: 'var(--color-canvas-default)' }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--color-fg-default)] mb-1">Job 名称 *</label>
+            <input
+              value={jobName}
+              onChange={(e) => setJobName(e.target.value)}
+              required
+              placeholder="my-app-build"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              style={{ background: 'var(--color-canvas-default)' }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--color-fg-default)] mb-1">用户名 *</label>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              placeholder="Jenkins 用户名"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              style={{ background: 'var(--color-canvas-default)' }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--color-fg-default)] mb-1">API Token *</label>
+            <input
+              type="password"
+              value={apiToken}
+              onChange={(e) => setApiToken(e.target.value)}
+              required
+              placeholder="Jenkins 用户 API Token"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              style={{ background: 'var(--color-canvas-default)' }}
+            />
+            <p className="text-xs text-[var(--color-fg-muted)] mt-1">
+              在 Jenkins 用户设置页生成：Jenkins → 用户 → Configure → API Token
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm text-[var(--color-fg-default)] mb-1">产物匹配规则</label>
+            <input
+              value={artifactPattern}
+              onChange={(e) => setArtifactPattern(e.target.value)}
+              placeholder="*.zip"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              style={{ background: 'var(--color-canvas-default)' }}
+            />
+            <p className="text-xs text-[var(--color-fg-muted)] mt-1">
+              支持通配符，如 <code className="px-1 rounded bg-[var(--color-canvas-default)]">*.zip</code> 或 <code className="px-1 rounded bg-[var(--color-canvas-default)]">app-*.zip</code>
+            </p>
+          </div>
+          {error && <p className="text-xs text-[var(--color-danger-fg)]">{error}</p>}
+          <div className="flex gap-3 pt-2">
+            {existingConfig && (
+              !showDeleteConfirm ? (
+                <button type="button" onClick={() => setShowDeleteConfirm(true)} className="flex-1 py-2 text-sm border border-[var(--color-danger-fg)] rounded-lg text-[var(--color-danger-fg)] hover:bg-[rgba(248,81,73,0.1)] transition-all">
+                  删除配置
+                </button>
+              ) : (
+                <button type="button" onClick={handleDelete} disabled={loading} className="flex-1 py-2 text-sm border border-[var(--color-danger-fg)] rounded-lg text-[var(--color-danger-fg)] hover:bg-[rgba(248,81,73,0.1)] transition-all">
+                  确认删除？
+                </button>
+              )
+            )}
+            <button type="button" onClick={onClose} className="flex-1 py-2 text-sm border border-[var(--color-border-default)] rounded-lg text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all">取消</button>
+            <button type="submit" disabled={loading} className="flex-1 py-2 text-sm bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white rounded-lg transition-colors disabled:opacity-60">
+              {loading ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

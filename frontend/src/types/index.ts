@@ -52,3 +52,49 @@ export interface AdminStats {
   totalAssets: number;
   recentReleases: Release[];
 }
+
+export interface JenkinsConfig {
+  id?: number;
+  package_id: number;
+  package_name?: string;
+  jenkins_url: string;
+  job_name: string;
+  username: string;
+  api_token?: string;
+  artifact_pattern: string;
+  created_at?: string;
+}
+
+export interface JenkinsBuildResult {
+  triggered: boolean;
+  buildNumber: number | null;
+  status: 'queued' | 'building' | 'completed' | 'failed' | 'partial';
+  result?: string | null;
+  releaseId?: number;
+  tagName?: string;
+  artifactName?: string;
+  artifactSize?: number;
+  message?: string;
+}
+
+export interface PackageBuildStatus {
+  package_id: number;
+  package_name: string;
+  job_name: string;
+  build_number: number | null;
+  status: 'pending' | 'triggering' | 'building' | 'downloading' | 'completed' | 'failed';
+  result: string | null;
+  artifact_name: string | null;
+  artifact_size: number | null;
+  error: string | null;
+  progress: number;
+}
+
+export interface BuildSession {
+  id: string;
+  tag_name: string;
+  created_at: string;
+  packages: PackageBuildStatus[];
+  overall_status: 'running' | 'completed' | 'failed';
+  release_id: number | null;
+}

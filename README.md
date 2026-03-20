@@ -1,6 +1,6 @@
 # VersionManage
 
-版本发布管理平台，类似 GitHub Releases，支持版本查看、包下载、管理后台登录、版本维护和包上传。
+版本发布管理平台，类似 GitHub Releases，支持版本查看、包下载、管理后台登录、版本维护、Jenkins 一键发版。
 
 ## 技术栈
 
@@ -9,7 +9,6 @@
 - Vite 4.x
 - React Router v6
 - TailwindCSS
-- Remotion (动画)
 
 ### 后端
 - Express + TypeScript
@@ -24,14 +23,14 @@ VersionManage/
 ├── frontend/                 # 前端应用
 │   └── src/
 │       ├── pages/           # 页面组件
-│       ├── components/      # 通用组件
+│       ├── components/      # 通用组件（含登录页动画组件）
 │       ├── services/        # API 服务
-│       ├── animations/      # Remotion 动画
+│       ├── animations/      # 动画组件
 │       └── types/           # TypeScript 类型
 ├── backend/                  # 后端应用
 │   └── src/
-│       ├── routes/          # 路由处理
-│       ├── middleware/      # 中间件
+│       ├── routes/          # 路由（admin.ts, public.ts, jenkins.ts）
+│       ├── middleware/      # 中间件（auth.ts 含 requireAdmin）
 │       └── db/              # 数据库
 ├── uploads/                  # 上传文件存储
 ├── data.db                   # SQLite 数据库
@@ -67,15 +66,25 @@ npm run dev
 
 ### 前台页面
 - 版本列表展示（支持按包名筛选）
-- 版本详情页（变更日志、文件下载）
-- Remotion 动画效果
+- 版本详情页（变更日志、文件下载、下载次数统计）
+- 数据统计（版本数、软件包数、总下载次数）
 
 ### 后台管理
+- 用户权限系统（admin / user 两种角色）
 - JWT 认证登录
-- 版本发布管理（创建/编辑/删除）
-- 软件包管理
+- 版本发布管理（创建 / 编辑 / 删除）
+- 软件包管理（每个包可独立配置 Jenkins）
 - 文件上传（最大 500MB）
 - 数据统计
+- **一键发版**: 触发所有已配置 Jenkins 的包，并行构建，实时显示每个包的构建进度
+
+### 一键发版流程
+1. 在"软件包"标签中，为每个包配置 Jenkins（地址、Job名、用户名、API Token、产物匹配规则）
+2. 进入"版本管理"标签，点击顶部 **🚀 一键发版** 按钮
+3. 系统自动计算下一个版本号（从最新版本累加）
+4. 所有已配置 Jenkins 的包并行触发构建
+5. 进度弹窗实时显示每个包的构建状态（触发中 → 构建中 → 下载产物 → 完成）
+6. 构建完成后的 zip 产物自动下载并关联为版本附件
 
 ## API 接口
 
@@ -88,11 +97,11 @@ npm run dev
 | GET | /api/assets/:id/download | 下载文件 |
 | GET | /api/stats | 获取统计数据 |
 
-### 管理接口（需登录）
+### 管理接口（需 admin 权限）
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | /api/admin/login | 登录 |
-| GET | /api/admin/releases | 获取所有版本 |
+| GET | /api/admin/releases | 获取所有版本（含草稿） |
 | POST | /api/admin/releases | 创建版本 |
 | PUT | /api/admin/releases/:id | 更新版本 |
 | DELETE | /api/admin/releases/:id | 删除版本 |
@@ -101,6 +110,21 @@ npm run dev
 | GET | /api/admin/packages | 获取软件包 |
 | POST | /api/admin/packages | 创建软件包 |
 | DELETE | /api/admin/packages/:id | 删除软件包 |
+| GET | /api/admin/stats | 获取统计数据 |
+| GET | /api/admin/users | 获取用户列表 |
+| POST | /api/admin/users | 创建用户 |
+| DELETE | /api/admin/users/:id | 删除用户 |
+
+### Jenkins CI 接口（需 admin 权限）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/admin/jenkins-config/:packageId | 获取某包的 Jenkins 配置 |
+| GET | /api/admin/jenkins-configs | 获取所有 Jenkins 配置 |
+| POST | /api/admin/jenkins-config | 创建/更新 Jenkins 配置 |
+| DELETE | /api/admin/jenkins-config/:packageId | 删除 Jenkins 配置 |
+| POST | /api/admin/jenkins-build/trigger-all | 触发所有包并行构建 |
+| GET | /api/admin/jenkins-build/session/:sessionId | 获取构建会话状态 |
+| GET | /api/admin/jenkins-build/history | 获取构建历史 |
 
 ## 构建生产版本
 

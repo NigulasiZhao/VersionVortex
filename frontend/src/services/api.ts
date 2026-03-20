@@ -69,4 +69,13 @@ export const createUser = (data: { username: string; password: string; role?: st
   api.post('/admin/users', data).then((r) => r.data);
 export const deleteUser = (id: number) => api.delete(`/admin/users/${id}`).then((r) => r.data);
 
+// Jenkins CI APIs
+export const getJenkinsConfigs = () => api.get('/admin/jenkins-configs').then((r) => r.data);
+export const getJenkinsConfig = (packageId: number) => api.get(`/admin/jenkins-config/${packageId}`).then((r) => r.data);
+export const saveJenkinsConfig = (data: any) => api.post('/admin/jenkins-config', data).then((r) => r.data);
+export const deleteJenkinsConfig = (packageId: number) => api.delete(`/admin/jenkins-config/${packageId}`).then((r) => r.data);
+export const triggerAllJenkinsBuilds = () => api.post('/admin/jenkins-build/trigger-all').then((r) => r.data);
+export const getJenkinsBuildSession = (sessionId: string) => api.get(`/admin/jenkins-build/session/${sessionId}`).then((r) => r.data);
+export const getJenkinsBuildHistory = () => api.get('/admin/jenkins-build/history').then((r) => r.data);
+
 export default api;
