@@ -5,6 +5,7 @@ import ReleaseDetail from './pages/ReleaseDetail';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import VersionEdit from './pages/VersionEdit';
+import Login from './pages/Login';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="releases/:tag" element={<ReleaseDetail />} />
           <Route path="package/:name" element={<Home />} />
         </Route>
+        <Route path="/login" element={<Login />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route
           path="/admin"
@@ -49,7 +51,7 @@ function App() {
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('vm_token');
   if (!token) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }

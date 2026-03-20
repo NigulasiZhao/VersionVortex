@@ -63,4 +63,10 @@ export const uploadAsset = (releaseId: number, file: File) => {
 export const deleteAsset = (id: number) => api.delete(`/admin/assets/${id}`).then((r) => r.data);
 export const getAdminStats = () => api.get('/admin/stats').then((r) => r.data);
 
+// User management
+export const getAdminUsers = () => api.get('/admin/users').then((r) => r.data);
+export const createUser = (data: { username: string; password: string; role?: string }) =>
+  api.post('/admin/users', data).then((r) => r.data);
+export const deleteUser = (id: number) => api.delete(`/admin/users/${id}`).then((r) => r.data);
+
 export default api;

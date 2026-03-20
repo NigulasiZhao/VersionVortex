@@ -7,8 +7,11 @@ import {
   deleteRelease,
   deletePackage,
   createPackage,
+  getAdminUsers,
+  createUser,
+  deleteUser,
 } from '../services/api';
-import type { Release, Package, AdminStats } from '../types';
+import type { Release, Package, AdminStats, User } from '../types';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('zh-CN', {
@@ -22,8 +25,9 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [releases, setReleases] = useState<Release[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [tab, setTab] = useState<'releases' | 'packages'>('releases');
+  const [tab, setTab] = useState<'releases' | 'packages' | 'users'>('releases');
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
 
@@ -34,11 +38,12 @@ export default function AdminDashboard() {
   }
 
   const load = () => {
-    Promise.all([getAdminReleases(), getAdminPackages(), getAdminStats()])
-      .then(([r, p, s]) => {
+    Promise.all([getAdminReleases(), getAdminPackages(), getAdminStats(), getAdminUsers()])
+      .then(([r, p, s, u]) => {
         setReleases(r);
         setPackages(p);
         setStats(s);
+        setUsers(u);
       })
       .finally(() => setLoading(false));
   };
@@ -66,6 +71,19 @@ export default function AdminDashboard() {
       setPackages((prev) => prev.filter((p) => p.id !== id));
     } catch {
       alert('删除失败');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (!confirm('确定要删除此用户吗？')) return;
+    setDeleting(id);
+    try {
+      await deleteUser(id);
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err: any) {
+      alert(err.response?.data?.error || '删除失败');
     } finally {
       setDeleting(null);
     }
@@ -137,7 +155,7 @@ export default function AdminDashboard() {
         {/* Tabs + New Button */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex gap-1">
-            {(['releases', 'packages'] as const).map((t) => (
+            {(['releases', 'packages', 'users'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -147,7 +165,7 @@ export default function AdminDashboard() {
                     : 'text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]'
                 }`}
               >
-                {t === 'releases' ? '版本管理' : '软件包'}
+                {t === 'releases' ? '版本管理' : t === 'packages' ? '软件包' : '用户管理'}
               </button>
             ))}
           </div>
@@ -172,11 +190,18 @@ export default function AdminDashboard() {
               onDelete={handleDeleteRelease}
               deleting={deleting}
             />
-          ) : (
+          ) : tab === 'packages' ? (
             <PackagesTable
               packages={packages}
               onDelete={handleDeletePackage}
               deleting={deleting}
+            />
+          ) : (
+            <UsersTable
+              users={users}
+              onDelete={handleDeleteUser}
+              deleting={deleting}
+              onAdded={(user) => setUsers((prev) => [...prev, user])}
             />
           )}
         </div>
@@ -356,6 +381,159 @@ function PackageModal({ onAdded }: { onAdded: (pkg: Package) => void }) {
               <div>
                 <label className="block text-sm text-[var(--color-fg-default)] mb-1">主页</label>
                 <input value={homepage} onChange={(e) => setHomepage(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]" style={{ background: 'var(--color-canvas-default)' }} />
+              </div>
+              {error && <p className="text-xs text-[var(--color-danger-fg)]">{error}</p>}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setOpen(false)} className="flex-1 py-2 text-sm border border-[var(--color-border-default)] rounded-lg text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all">取消</button>
+                <button type="submit" disabled={loading} className="flex-1 py-2 text-sm bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white rounded-lg transition-colors disabled:opacity-60">
+                  {loading ? '创建中...' : '创建'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function UsersTable({ users, onDelete, deleting, onAdded }: {
+  users: User[];
+  onDelete: (id: number) => void;
+  deleting: number | null;
+  onAdded: (user: User) => void;
+}) {
+  return (
+    <>
+      <div className="p-4 flex justify-end">
+        <UserModal onAdded={onAdded} />
+      </div>
+      {users.length === 0 ? (
+        <div className="text-center py-12 text-[var(--color-fg-muted)] text-sm">
+          暂无用户，点击右上角「新建用户」创建
+        </div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--color-border-default)] text-left">
+              <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider">用户名</th>
+              <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider">角色</th>
+              <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider">创建时间</th>
+              <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--color-border-muted)]">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-[var(--color-canvas-default)] transition-colors">
+                <td className="px-4 py-3 font-medium text-[var(--color-fg-default)]">{user.username}</td>
+                <td className="px-4 py-3">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                    user.role === 'admin'
+                      ? 'border-[var(--color-accent-fg)] text-[var(--color-accent-fg)]'
+                      : 'border-[var(--color-fg-muted)] text-[var(--color-fg-muted)]'
+                  }`}>
+                    {user.role === 'admin' ? '管理员' : '普通用户'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-[var(--color-fg-muted)]">{new Date(user.created_at).toLocaleDateString('zh-CN')}</td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() => onDelete(user.id)}
+                    disabled={deleting === user.id}
+                    className="text-xs px-3 py-1 rounded-md border border-[var(--color-border-default)] text-[var(--color-danger-fg)] hover:border-[var(--color-danger-fg)] transition-all disabled:opacity-50"
+                  >
+                    {deleting === user.id ? '删除中' : '删除'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
+function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
+  const [open, setOpen] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('user');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const user = await createUser({ username, password, role });
+      onAdded(user);
+      setOpen(false);
+      setUsername('');
+      setPassword('');
+      setRole('user');
+    } catch (err: any) {
+      setError(err.response?.data?.error || '创建失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs px-4 py-2 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white transition-colors"
+      >
+        + 新建用户
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="w-full max-w-md border border-[var(--color-border-default)] rounded-xl" style={{ background: 'var(--color-canvas-subtle)' }}>
+            <div className="px-5 py-4 border-b border-[var(--color-border-default)] flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">新建用户</h3>
+              <button onClick={() => setOpen(false)} className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm text-[var(--color-fg-default)] mb-1">用户名 *</label>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+                  style={{ background: 'var(--color-canvas-default)' }}
+                  placeholder="输入用户名"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-[var(--color-fg-default)] mb-1">密码 *</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+                  style={{ background: 'var(--color-canvas-default)' }}
+                  placeholder="输入密码（至少6位）"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-[var(--color-fg-default)] mb-1">角色</label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+                  style={{ background: 'var(--color-canvas-default)' }}
+                >
+                  <option value="user">普通用户</option>
+                  <option value="admin">管理员</option>
+                </select>
               </div>
               {error && <p className="text-xs text-[var(--color-danger-fg)]">{error}</p>}
               <div className="flex gap-3 pt-2">

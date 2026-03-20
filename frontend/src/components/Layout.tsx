@@ -1,7 +1,21 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('vm_token');
+    setIsLoggedIn(!!token);
+  }, [location]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('vm_token');
+    setIsLoggedIn(false);
+    navigate('/');
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -24,12 +38,30 @@ export default function Layout() {
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              to="/admin"
-              className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)] transition-all no-underline"
-            >
-              管理后台
-            </Link>
+            {isLoggedIn ? (
+              <>
+                <Link
+                  to="/admin"
+                  className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)] transition-all no-underline"
+                >
+                  管理后台
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[var(--color-danger-fg)] hover:text-[var(--color-danger-fg)] transition-all"
+                >
+                  退出
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="text-xs px-4 py-1.5 rounded-md text-white transition-all no-underline"
+                style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+              >
+                登录
+              </Link>
+            )}
           </div>
         </div>
       </header>

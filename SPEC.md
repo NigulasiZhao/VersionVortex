@@ -9,7 +9,7 @@
 |------|------|
 | 前端框架 | React + TypeScript + Vite 4.x |
 | 路由 | React Router v6 |
-| 样式 | TailwindCSS (dark theme, GitHub 风格) |
+| 样式 | TailwindCSS (GitHub 风格浅色主题) |
 | 动画 | Remotion (v4.0.437) |
 | 后端 | Express + TypeScript |
 | 数据库 | SQLite (sql.js - 纯 JS WASM 实现) |
@@ -20,6 +20,7 @@
 ## 功能模块
 
 ### 前台页面 (Public)
+- **登录页** (`/login`) - 现代风格登录页面，JWT 认证
 - **Releases 列表页** (`/`) - 展示所有版本，支持按包名筛选
   - Remotion 动画 Hero 区域（数字滚动动画）
   - Remotion 动画版本卡片列表预览
@@ -29,7 +30,7 @@
 
 ### 后台管理 (Admin)
 - **登录页** (`/admin/login`) - JWT 认证登录
-- **仪表盘** (`/admin`) - 统计数据、版本列表、软件包管理
+- **仪表盘** (`/admin`) - 统计数据、版本列表、软件包管理、用户管理
 - **版本编辑** (`/admin/releases/new`, `/admin/releases/:id/edit`)
   - 创建/编辑版本（版本号、标题、变更日志 Markdown、预发布/草稿状态）
   - 上传附件文件（自动记录文件大小）
@@ -47,8 +48,9 @@ npm run dev
 
 访问地址：
 - 前台：http://localhost:5173
+- 登录：http://localhost:5173/login
 - 后台：http://localhost:5173/admin
-- API：http://localhost:3001
+- API：http://localhost:8080
 
 默认后台账号：`admin` / `admin123`
 
@@ -74,4 +76,7 @@ npm run dev
 - `GET /api/admin/packages` - 获取所有包
 - `POST /api/admin/packages` - 创建包
 - `DELETE /api/admin/packages/:id` - 删除包
+- `GET /api/admin/users` - 获取所有用户
+- `POST /api/admin/users` - 创建用户
+- `DELETE /api/admin/users/:id` - 删除用户
 - `GET /api/admin/stats` - 后台统计数据

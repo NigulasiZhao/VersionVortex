@@ -228,4 +228,68 @@ router.get('/stats', authenticateToken, (_req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/admin/users - Get all users
+router.get('/users', authenticateToken, (req: AuthRequest, res: Response) => {
+  try {
+    const users = getDb().prepare('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC').all();
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: '获取用户列表失败' });
+  }
+});
+
+// POST /api/admin/users - Create user
+router.post('/users', authenticateToken, (req: AuthRequest, res: Response) => {
+  try {
+    const { username, password, role } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: '用户名和密码不能为空' });
+    }
+
+    // Check if user already exists
+    const existing = getDb().prepare('SELECT id FROM users WHERE username = ?').get(username);
+    if (existing) {
+      return res.status(409).json({ error: '用户名已存在' });
+    }
+
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const result = getDb().prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+      .run(username, passwordHash, role || 'user');
+
+    const user = getDb().prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json(user);
+  } catch (err) {
+    res.status(500).json({ error: '创建用户失败' });
+  }
+});
+
+// DELETE /api/admin/users/:id - Delete user
+router.delete('/users/:id', authenticateToken, (req: AuthRequest, res: Response) => {
+  try {
+    const user = getDb().prepare('SELECT id, role FROM users WHERE id = ?').get(req.params.id) as any;
+    if (!user) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+
+    // Prevent deleting yourself
+    const currentUser = (req as any).user;
+    if (currentUser.id === parseInt(req.params.id)) {
+      return res.status(400).json({ error: '不能删除当前登录账号' });
+    }
+
+    // Prevent deleting the last admin
+    if (user.role === 'admin') {
+      const adminCount = (getDb().prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'").get() as any).count;
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: '不能删除最后一个管理员账号' });
+      }
+    }
+
+    getDb().prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+    res.json({ message: '删除成功' });
+  } catch (err) {
+    res.status(500).json({ error: '删除用户失败' });
+  }
+});
+
 export default router;

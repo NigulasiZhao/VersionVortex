@@ -9,6 +9,13 @@ export interface Package {
   latest_release_date?: string;
 }
 
+export interface User {
+  id: number;
+  username: string;
+  role: string;
+  created_at: string;
+}
+
 export interface Release {
   id: number;
   package_id: number;
