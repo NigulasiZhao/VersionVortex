@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   getAdminReleases,
   getAdminPackages,
@@ -22,7 +22,6 @@ function formatDate(dateStr: string) {
 }
 
 export default function AdminDashboard() {
-  const navigate = useNavigate();
   const [releases, setReleases] = useState<Release[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -30,12 +29,6 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<'releases' | 'packages' | 'users'>('releases');
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
-
-  const token = localStorage.getItem('vm_token');
-  if (!token) {
-    navigate('/admin/login');
-    return null;
-  }
 
   const load = () => {
     Promise.all([getAdminReleases(), getAdminPackages(), getAdminStats(), getAdminUsers()])
@@ -89,11 +82,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('vm_token');
-    navigate('/');
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-canvas-default)' }}>
@@ -104,44 +92,14 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-canvas-default)' }}>
-      {/* Admin Header */}
-      <header className="border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2 no-underline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-fg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              </svg>
-              <span className="font-semibold text-sm text-[var(--color-fg-default)]">VersionManage</span>
-            </Link>
-            <span className="text-[var(--color-fg-muted)] text-sm">/</span>
-            <span className="text-sm text-[var(--color-fg-default)] font-medium">管理后台</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="text-xs text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)] no-underline px-3 py-1.5 rounded-md border border-[var(--color-border-default)] hover:border-[var(--color-fg-muted)] transition-all"
-            >
-              查看前台
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="text-xs text-[var(--color-fg-muted)] hover:text-[var(--color-danger-fg)] px-3 py-1.5 rounded-md border border-[var(--color-border-default)] hover:border-[var(--color-danger-fg)] transition-all"
-            >
-              退出登录
-            </button>
-          </div>
-        </div>
-      </header>
-
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             {[
               { label: '版本总数', value: stats.totalReleases, color: 'var(--color-accent-fg)' },
               { label: '软件包', value: stats.totalPackages, color: 'var(--color-success-fg)' },
-              { label: '下载次数', value: Number(stats.totalDownloads).toLocaleString(), color: 'var(--color-attention-fg)' },
+              { label: '下载次数', value: Number(stats.totalDownloads).toLocaleString(), color: 'var(--color-accent-fg)' },
               { label: '草稿版本', value: stats.draftReleases, color: 'var(--color-fg-muted)' },
             ].map((stat) => (
               <div key={stat.label} className="border border-[var(--color-border-default)] rounded-xl p-4" style={{ background: 'var(--color-canvas-subtle)' }}>
@@ -467,8 +425,10 @@ function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
     setError('');
     setLoading(true);
     try {
-      const user = await createUser({ username, password, role });
-      onAdded(user);
+      await createUser({ username, password, role });
+      // Refresh the users list since API returns empty body
+      const users = await getAdminUsers();
+      onAdded(users[0]); // The newly created user will be first (sorted by created_at DESC)
       setOpen(false);
       setUsername('');
       setPassword('');

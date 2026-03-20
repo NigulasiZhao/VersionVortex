@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "scripts": {
-    "dev": "tsx watch src/app.ts",
+    "dev": "tsc && node dist/app.js",
     "build": "tsc",
     "start": "node dist/app.js"
   },

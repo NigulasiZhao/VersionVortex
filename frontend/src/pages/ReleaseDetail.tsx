@@ -171,12 +171,8 @@ export default function ReleaseDetail() {
                       </button>
                       <div className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">
                         <span>{formatBytes(asset.size)}</span>
-                        {asset.download_count > 0 && (
-                          <>
-                            <span>·</span>
-                            <span>{Number(asset.download_count).toLocaleString()} 次下载</span>
-                          </>
-                        )}
+                        <span>·</span>
+                        <span>{Number(asset.download_count).toLocaleString()} 次下载</span>
                       </div>
                     </div>
                     <button

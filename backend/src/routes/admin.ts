@@ -5,7 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../db/index';
-import { authenticateToken, AuthRequest, JWT_SECRET } from '../middleware/auth';
+import { authenticateToken, requireAdmin, AuthRequest, JWT_SECRET } from '../middleware/auth';
 
 const router = Router();
 
@@ -41,12 +41,12 @@ router.post('/login', (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/admin/logout
-router.post('/logout', authenticateToken, (_req: AuthRequest, res: Response) => {
+router.post('/logout', authenticateToken, requireAdmin, (_req: AuthRequest, res: Response) => {
   res.json({ message: '登出成功' });
 });
 
 // GET /api/admin/releases - Get all releases (including drafts)
-router.get('/releases', authenticateToken, (_req: AuthRequest, res: Response) => {
+router.get('/releases', authenticateToken, requireAdmin, (_req: AuthRequest, res: Response) => {
   try {
     const releases = getDb().prepare(`
       SELECT r.*, p.name as package_name,
@@ -62,7 +62,7 @@ router.get('/releases', authenticateToken, (_req: AuthRequest, res: Response) =>
 });
 
 // POST /api/admin/releases - Create release
-router.post('/releases', authenticateToken, (req: AuthRequest, res: Response) => {
+router.post('/releases', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     const { package_id, tag_name, title, body, is_draft, is_prerelease } = req.body;
     if (!package_id || !tag_name) {
@@ -75,7 +75,8 @@ router.post('/releases', authenticateToken, (req: AuthRequest, res: Response) =>
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(package_id, tag_name, title || '', body || '', is_draft ? 1 : 0, is_prerelease ? 1 : 0);
 
-      const release = getDb().prepare('SELECT * FROM releases WHERE id = ?').get(result.lastInsertRowid);
+      const releaseId = Number(result.lastInsertRowid);
+      const release = getDb().prepare('SELECT * FROM releases WHERE id = ?').get(releaseId);
       res.status(201).json(release);
     } catch (err: any) {
       if (err.message?.includes('UNIQUE') || err.message?.includes('unique')) {
@@ -89,7 +90,7 @@ router.post('/releases', authenticateToken, (req: AuthRequest, res: Response) =>
 });
 
 // PUT /api/admin/releases/:id - Update release
-router.put('/releases/:id', authenticateToken, (req: AuthRequest, res: Response) => {
+router.put('/releases/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     const { title, body, is_draft, is_prerelease } = req.body;
     getDb().prepare(`
@@ -107,7 +108,7 @@ router.put('/releases/:id', authenticateToken, (req: AuthRequest, res: Response)
 });
 
 // DELETE /api/admin/releases/:id - Delete release
-router.delete('/releases/:id', authenticateToken, (req: AuthRequest, res: Response) => {
+router.delete('/releases/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     const assets = getDb().prepare('SELECT file_path FROM assets WHERE release_id = ?').all(req.params.id) as any[];
     const fs = require('fs');
@@ -126,7 +127,7 @@ router.delete('/releases/:id', authenticateToken, (req: AuthRequest, res: Respon
 });
 
 // POST /api/admin/releases/:id/assets - Upload asset
-router.post('/releases/:id/assets', authenticateToken, upload.single('file'), (req: AuthRequest, res: Response) => {
+router.post('/releases/:id/assets', authenticateToken, requireAdmin, upload.single('file'), (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: '请选择文件' });
@@ -142,7 +143,8 @@ router.post('/releases/:id/assets', authenticateToken, upload.single('file'), (r
       VALUES (?, ?, ?, ?)
     `).run(req.params.id, req.file!.originalname, req.file!.size, req.file!.path);
 
-    const asset = getDb().prepare('SELECT * FROM assets WHERE id = ?').get(result.lastInsertRowid);
+    const assetId = Number(result.lastInsertRowid);
+    const asset = getDb().prepare('SELECT * FROM assets WHERE id = ?').get(assetId);
     res.status(201).json(asset);
   } catch (err) {
     res.status(500).json({ error: '上传文件失败' });
@@ -150,7 +152,7 @@ router.post('/releases/:id/assets', authenticateToken, upload.single('file'), (r
 });
 
 // DELETE /api/admin/assets/:id - Delete asset
-router.delete('/assets/:id', authenticateToken, (req: AuthRequest, res: Response) => {
+router.delete('/assets/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     const asset = getDb().prepare('SELECT * FROM assets WHERE id = ?').get(req.params.id) as any;
     if (!asset) return res.status(404).json({ error: '文件不存在' });
@@ -170,7 +172,7 @@ router.delete('/assets/:id', authenticateToken, (req: AuthRequest, res: Response
 });
 
 // GET /api/admin/packages - Get all packages
-router.get('/packages', authenticateToken, (_req: AuthRequest, res: Response) => {
+router.get('/packages', authenticateToken, requireAdmin, (_req: AuthRequest, res: Response) => {
   try {
     const packages = getDb().prepare('SELECT * FROM packages ORDER BY name ASC').all();
     res.json(packages);
@@ -180,15 +182,15 @@ router.get('/packages', authenticateToken, (_req: AuthRequest, res: Response) =>
 });
 
 // POST /api/admin/packages - Create package
-router.post('/packages', authenticateToken, (req: AuthRequest, res: Response) => {
+router.post('/packages', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     const { name, description, homepage } = req.body;
     if (!name) return res.status(400).json({ error: '包名不能为空' });
 
     try {
-      const result = getDb().prepare('INSERT INTO packages (name, description, homepage) VALUES (?, ?, ?)')
-        .run(name, description || '', homepage || '');
-      const pkg = getDb().prepare('SELECT * FROM packages WHERE id = ?').get(result.lastInsertRowid);
+      const result = getDb().prepare('INSERT INTO packages (name, description, homepage) VALUES (?, ?, ?)').run(name, description || '', homepage || '');
+      const pkgId = Number(result.lastInsertRowid);
+      const pkg = getDb().prepare('SELECT * FROM packages WHERE id = ?').get(pkgId);
       res.status(201).json(pkg);
     } catch (err: any) {
       if (err.message?.includes('UNIQUE') || err.message?.includes('unique')) {
@@ -202,7 +204,7 @@ router.post('/packages', authenticateToken, (req: AuthRequest, res: Response) =>
 });
 
 // DELETE /api/admin/packages/:id - Delete package
-router.delete('/packages/:id', authenticateToken, (req: AuthRequest, res: Response) => {
+router.delete('/packages/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     getDb().prepare('DELETE FROM packages WHERE id = ?').run(req.params.id);
     res.json({ message: '删除成功' });
@@ -212,7 +214,7 @@ router.delete('/packages/:id', authenticateToken, (req: AuthRequest, res: Respon
 });
 
 // GET /api/admin/stats - Admin stats
-router.get('/stats', authenticateToken, (_req: AuthRequest, res: Response) => {
+router.get('/stats', authenticateToken, requireAdmin, (_req: AuthRequest, res: Response) => {
   try {
     const stats = {
       totalReleases: (getDb().prepare('SELECT COUNT(*) as count FROM releases').get() as any).count,
@@ -229,7 +231,7 @@ router.get('/stats', authenticateToken, (_req: AuthRequest, res: Response) => {
 });
 
 // GET /api/admin/users - Get all users
-router.get('/users', authenticateToken, (req: AuthRequest, res: Response) => {
+router.get('/users', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     const users = getDb().prepare('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC').all();
     res.json(users);
@@ -239,7 +241,7 @@ router.get('/users', authenticateToken, (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/admin/users - Create user
-router.post('/users', authenticateToken, (req: AuthRequest, res: Response) => {
+router.post('/users', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     const { username, password, role } = req.body;
     if (!username || !password) {
@@ -253,18 +255,20 @@ router.post('/users', authenticateToken, (req: AuthRequest, res: Response) => {
     }
 
     const passwordHash = bcrypt.hashSync(password, 10);
-    const result = getDb().prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
-      .run(username, passwordHash, role || 'user');
+    const result = getDb().prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)').run(username, passwordHash, role || 'user');
 
-    const user = getDb().prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
+    // Get the last inserted user using the returned lastInsertRowid
+    const userId = Number(result.lastInsertRowid);
+    const user = getDb().prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(userId);
     res.status(201).json(user);
   } catch (err) {
+    console.error('Create user error:', err);
     res.status(500).json({ error: '创建用户失败' });
   }
 });
 
 // DELETE /api/admin/users/:id - Delete user
-router.delete('/users/:id', authenticateToken, (req: AuthRequest, res: Response) => {
+router.delete('/users/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
     const user = getDb().prepare('SELECT id, role FROM users WHERE id = ?').get(req.params.id) as any;
     if (!user) {
@@ -272,8 +276,7 @@ router.delete('/users/:id', authenticateToken, (req: AuthRequest, res: Response)
     }
 
     // Prevent deleting yourself
-    const currentUser = (req as any).user;
-    if (currentUser.id === parseInt(req.params.id)) {
+    if (req.userId === parseInt(req.params.id)) {
       return res.status(400).json({ error: '不能删除当前登录账号' });
     }
 

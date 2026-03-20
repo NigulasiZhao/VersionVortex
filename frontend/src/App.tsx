@@ -16,6 +16,10 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="releases/:tag" element={<ReleaseDetail />} />
           <Route path="package/:name" element={<Home />} />
+        </Route>
+
+        {/* Admin routes - require admin role */}
+        <Route element={<RequireAuth><RequireAdmin><Layout /></RequireAdmin></RequireAuth>}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/releases/new" element={<VersionEdit />} />
           <Route path="/admin/releases/:id/edit" element={<VersionEdit />} />
@@ -36,6 +40,15 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('vm_token');
   if (!token) {
     return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const role = localStorage.getItem('vm_role');
+  if (role !== 'admin') {
+    // Redirect non-admin users to home page
+    return <Navigate to="/" replace />;
   }
   return <>{children}</>;
 }

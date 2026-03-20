@@ -5,53 +5,60 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   useEffect(() => {
     const storedUsername = localStorage.getItem('vm_username');
+    const storedRole = localStorage.getItem('vm_role');
     if (storedUsername) {
       setUsername(storedUsername);
     }
+    setIsAdmin(storedRole === 'admin');
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('vm_token');
     localStorage.removeItem('vm_username');
+    localStorage.removeItem('vm_role');
     navigate('/login');
   };
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="border-b bg-card">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
+      <header className="border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-2 no-underline">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-fg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                <line x1="12" y1="22.08" x2="12" y2="12"/>
               </svg>
-              <span className="font-semibold text-base text-foreground">VersionManage</span>
+              <span className="font-semibold text-sm text-[var(--color-fg-default)]">VersionManage</span>
             </Link>
-            <nav className="hidden md:flex items-center gap-4 text-sm">
-              <Link to="/" className={`no-underline px-2 py-1 rounded-md transition-colors ${location.pathname === '/' ? 'text-foreground bg-secondary' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}`}>
-                Releases
-              </Link>
-            </nav>
+            {isAdminPage && (
+              <>
+                <span className="text-[var(--color-fg-muted)]">/</span>
+                <span className="text-sm text-[var(--color-fg-default)] font-medium">管理后台</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground hidden sm:inline">{username}</span>
-            <Link
-              to="/admin"
-              className="text-xs px-3 py-1.5 rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:border-primary transition-all no-underline"
-            >
-              管理后台
-            </Link>
+            <span className="text-xs text-[var(--color-fg-muted)] hidden sm:inline">{username}</span>
+            {isAdmin && (
+              <Link
+                to={isAdminPage ? "/" : "/admin"}
+                className="text-xs text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)] no-underline px-3 py-1.5 rounded-md border border-[var(--color-border-default)] hover:border-[var(--color-fg-muted)] transition-all"
+              >
+                {isAdminPage ? "查看前台" : "管理后台"}
+              </Link>
+            )}
             <button
               onClick={handleLogout}
-              className="text-xs px-3 py-1.5 rounded-md border border-input bg-background text-muted-foreground hover:text-destructive hover:border-destructive transition-all"
+              className="text-xs text-[var(--color-fg-muted)] hover:text-[var(--color-danger-fg)] px-3 py-1.5 rounded-md border border-[var(--color-border-default)] hover:border-[var(--color-danger-fg)] transition-all"
             >
-              退出
+              退出登录
             </button>
           </div>
         </div>
@@ -63,8 +70,8 @@ export default function Layout() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t py-6 text-center text-xs text-muted-foreground">
-        <div className="max-w-5xl mx-auto px-4">
+      <footer className="border-t py-6 text-center text-xs text-[var(--color-fg-muted)]">
+        <div className="max-w-6xl mx-auto px-4">
           VersionManage © {new Date().getFullYear()} · 开源版本管理平台
         </div>
       </footer>

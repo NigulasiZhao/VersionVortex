@@ -303,6 +303,7 @@ export function AnimatedCharactersLoginPage() {
       const data = await adminLogin(email, password);
       localStorage.setItem('vm_token', data.token);
       localStorage.setItem('vm_username', data.username);
+      localStorage.setItem('vm_role', data.role || 'user');
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || "登录失败，请重试");

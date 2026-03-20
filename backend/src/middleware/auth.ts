@@ -26,6 +26,13 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   }
 }
 
+export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.userRole !== 'admin') {
+    return res.status(403).json({ error: '需要管理员权限' });
+  }
+  next();
+}
+
 export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
