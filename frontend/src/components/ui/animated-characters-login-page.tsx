@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, Mail, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { adminLogin } from "@/services/api";
@@ -577,22 +577,14 @@ export function AnimatedCharactersLoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
-                <Label
-                  htmlFor="remember"
-                  className="text-sm font-normal cursor-pointer text-gray-600"
-                >
-                  记住我 30 天
-                </Label>
-              </div>
-              <a
-                href="#"
-                className="text-sm text-[#6C3FF5] hover:underline font-medium"
+            <div className="flex items-center space-x-2">
+              <Checkbox id="remember" />
+              <Label
+                htmlFor="remember"
+                className="text-sm font-normal cursor-pointer text-gray-600"
               >
-                忘记密码?
-              </a>
+                记住我 30 天
+              </Label>
             </div>
 
             {error && (
@@ -610,26 +602,6 @@ export function AnimatedCharactersLoginPage() {
               {isLoading ? "登录中..." : "登录"}
             </Button>
           </form>
-
-          {/* Social Login */}
-          <div className="mt-6">
-            <Button
-              variant="outline"
-              className="w-full h-12 bg-white border-gray-200 hover:bg-gray-50 text-gray-700"
-              type="button"
-            >
-              <Mail className="mr-2 size-5" />
-              使用 Google 登录
-            </Button>
-          </div>
-
-          {/* Sign Up Link */}
-          <div className="text-center text-sm text-gray-500 mt-8">
-            还没有账户?{" "}
-            <a href="#" className="text-gray-900 font-medium hover:underline">
-              联系管理员创建
-            </a>
-          </div>
         </div>
       </div>
     </div>
