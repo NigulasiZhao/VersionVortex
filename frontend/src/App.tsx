@@ -11,47 +11,39 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
+        {/* Public routes - require authentication */}
+        <Route element={<RequireAuth><Layout /></RequireAuth>}>
+          <Route path="/" element={<Home />} />
           <Route path="releases/:tag" element={<ReleaseDetail />} />
           <Route path="package/:name" element={<Home />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/releases/new" element={<VersionEdit />} />
+          <Route path="/admin/releases/:id/edit" element={<VersionEdit />} />
         </Route>
-        <Route path="/login" element={<Login />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/releases/new"
-          element={
-            <ProtectedRoute>
-              <VersionEdit />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/releases/:id/edit"
-          element={
-            <ProtectedRoute>
-              <VersionEdit />
-            </ProtectedRoute>
-          }
-        />
+
+        {/* Public login pages */}
+        <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+        <Route path="/admin/login" element={<PublicOnly><AdminLogin /></PublicOnly>} />
+
+        {/* Redirect root to home or login */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('vm_token');
   if (!token) {
     return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+function PublicOnly({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem('vm_token');
+  if (token) {
+    return <Navigate to="/" replace />;
   }
   return <>{children}</>;
 }

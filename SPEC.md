@@ -9,6 +9,7 @@
 |------|------|
 | 前端框架 | React + TypeScript + Vite 4.x |
 | 路由 | React Router v6 |
+| UI 组件 | shadcn/ui (button, input, card, label) |
 | 样式 | TailwindCSS (GitHub 风格浅色主题) |
 | 动画 | Remotion (v4.0.437) |
 | 后端 | Express + TypeScript |
@@ -16,6 +17,13 @@
 | 认证 | JWT (7天有效期) |
 | 文件上传 | Multer (支持最大 500MB) |
 | 包管理 | npm workspaces |
+
+## 认证说明
+
+所有内部页面（前台、后台管理）都需要登录访问：
+- 未登录用户访问任意页面自动跳转到登录页
+- 已登录用户访问登录页自动跳转到首页
+- 登录后 JWT token 存储在 localStorage
 
 ## 功能模块
 

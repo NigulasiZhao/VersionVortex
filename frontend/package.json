@@ -7,12 +7,17 @@
     "preview": "./node_modules/.bin/vite preview"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
     "@remotion/player": "^4.0.437",
     "axios": "^1.6.7",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.1",
-    "remotion": "^4.0.437"
+    "remotion": "^4.0.437",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
