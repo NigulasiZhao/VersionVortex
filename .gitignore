@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+frontend/dist/
+backend/dist/
+
+# Data and uploads
+data.db
+uploads/*
+!uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Cache
+.cache/
+.temp/
+
+# Claude
+.claude/
