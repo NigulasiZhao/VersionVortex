@@ -161,7 +161,7 @@ export function Timeline({ releases, packages }) {
 
   return (
     <div>
-      <div className="py-4">
+      <div className="py-2">
         <FluidDropdown
           options={dropdownOptions}
           value={selectedPackage}
