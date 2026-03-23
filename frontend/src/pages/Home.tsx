@@ -88,7 +88,7 @@ export default function Home() {
       <div className="relative z-10">
         {/* Hero */}
         <div
-          className="mb-8 py-6 px-6 rounded-2xl border"
+          className="mb-4 py-6 px-6 rounded-2xl border"
           style={{
             background: "linear-gradient(135deg, var(--color-canvas-subtle) 0%, rgba(108,63,245,0.04) 100%)",
             borderColor: "var(--color-border-default)",
