@@ -73,7 +73,9 @@ export interface JenkinsBuildResult {
   releaseId?: number;
   tagName?: string;
   artifactName?: string;
+  artifactNames?: string[];
   artifactSize?: number;
+  artifactSizes?: number[];
   message?: string;
 }
 
@@ -85,6 +87,8 @@ export interface PackageBuildStatus {
   status: 'pending' | 'triggering' | 'building' | 'downloading' | 'completed' | 'failed';
   result: string | null;
   artifact_name: string | null;
+  artifact_names: string[];
+  artifact_sizes: number[];
   artifact_size: number | null;
   error: string | null;
   progress: number;

@@ -34,7 +34,11 @@ function createWrapper(sqliteDb: SqlJsDatabase) {
         run(...params: any[]) {
           sqliteDb.run(sql, params);
           saveDb();
-          return { lastInsertRowid: sqliteDb.exec("SELECT last_insert_rowid()")[0]?.values[0]?.[0] };
+          const stmt = sqliteDb.prepare('SELECT last_insert_rowid() as id');
+          stmt.step();
+          const rowid = stmt.get()[0];
+          stmt.free();
+          return { lastInsertRowid: rowid };
         },
         get(...params: any[]) {
           const stmt = sqliteDb.prepare(sql);

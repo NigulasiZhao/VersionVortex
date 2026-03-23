@@ -53,9 +53,9 @@ npm run dev
 ```
 
 启动后访问：
-- 前台：http://localhost:5173
-- 后台：http://localhost:5173/admin
-- API：http://localhost:8080
+- 前台：http://localhost:12005
+- 后台：http://localhost:12005/admin
+- API：http://localhost:12006
 
 ### 默认账号
 

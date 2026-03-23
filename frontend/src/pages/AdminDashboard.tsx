@@ -318,10 +318,12 @@ export default function AdminDashboard() {
                         {pkg.error && (
                           <p className="text-xs text-[var(--color-danger-fg)]">{pkg.error}</p>
                         )}
-                        {pkg.artifact_name && pkg.status === 'completed' && (
-                          <p className="text-xs text-[var(--color-fg-muted)]">
-                            📦 {pkg.artifact_name}
-                          </p>
+                        {pkg.artifact_names && pkg.artifact_names.length > 0 && pkg.status === 'completed' && (
+                          <div className="text-xs text-[var(--color-fg-muted)] space-y-0.5">
+                            {pkg.artifact_names.map((name, i) => (
+                              <p key={i}>📦 {name} {pkg.artifact_sizes?.[i] ? `(${(pkg.artifact_sizes[i] / 1024 / 1024).toFixed(1)} MB)` : ''}</p>
+                            ))}
+                          </div>
                         )}
                       </div>
                     ))}

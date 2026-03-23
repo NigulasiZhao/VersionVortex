@@ -18,8 +18,10 @@ interface PackageBuildStatus {
   build_number: number | null;
   status: 'pending' | 'triggering' | 'building' | 'downloading' | 'completed' | 'failed';
   result: string | null;
-  artifact_name: string | null;
-  artifact_size: number | null;
+  artifact_name: string | null;  // 单个产物名（兼容旧显示）
+  artifact_names: string[];        // 所有产物名
+  artifact_sizes: number[];        // 所有产物大小
+  artifact_size: number | null;    // 单个产物大小（兼容旧显示）
   error: string | null;
   progress: number; // 0-100
 }
@@ -37,21 +39,22 @@ const buildSessions = new Map<string, BuildSession>();
 
 // Helper: increment version number
 function incrementVersion(latestTag: string | null): string {
-  if (!latestTag) return 'v1.0.0';
+  if (!latestTag) return '1.0.0';
   const match = latestTag.match(/^v?(\d+)\.(\d+)\.(\d+)(.*)$/);
-  if (!match) return 'v1.0.0';
+  if (!match) return '1.0.0';
   const [, major, minor, patch, suffix] = match;
-  return `v${major}.${minor}.${parseInt(patch) + 1}${suffix}`;
+  return `${major}.${minor}.${parseInt(patch) + 1}${suffix}`;
 }
 
-// Helper: HTTP request with Basic Auth
+// Helper: HTTP request with Basic Auth (30s timeout guarantee)
 function jenkinsRequest(url: string, options: any, credentials: string): Promise<{ res: any; body: string }> {
-  return new Promise((resolve, reject) => {
+  const timeoutMs = 30000;
+  const reqPromise = new Promise<{ res: any; body: string }>((resolve, reject) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === 'https:';
     const lib = isHttps ? https : http;
 
-    const reqOptions = {
+    const reqOptions: http.RequestOptions = {
       hostname: urlObj.hostname,
       port: urlObj.port || (isHttps ? 443 : 80),
       path: urlObj.pathname + urlObj.search,
@@ -60,7 +63,6 @@ function jenkinsRequest(url: string, options: any, credentials: string): Promise
         'Authorization': `Basic ${credentials}`,
         ...options.headers,
       },
-      rejectUnauthorized: false, // 忽略证书错误
     };
 
     const req = lib.request(reqOptions, (res) => {
@@ -69,31 +71,58 @@ function jenkinsRequest(url: string, options: any, credentials: string): Promise
       res.on('end', () => resolve({ res, body }));
     });
     req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error(`Request timeout after ${timeoutMs}ms`)); });
     if (options.body) req.write(options.body);
     req.end();
   });
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Request timeout after ${timeoutMs}ms for ${url}`)), timeoutMs)
+  );
+
+  return Promise.race([reqPromise, timeoutPromise]);
 }
 
-// Helper: download file
-function downloadFile(url: string, destPath: string, credentials: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
+// Helper: download file (with timeout and crumb auth)
+async function downloadFile(url: string, destPath: string, credentials: string): Promise<number> {
+  const timeoutMs = 60000;
+  const urlObj = new URL(url);
+  const baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.port ? ':' + urlObj.port : ''}`;
+
+  // Fetch crumb first for CSRF protection
+  let crumbHeader = '';
+  try {
+    const { body: crumbBody } = await jenkinsRequest(`${baseUrl}/crumbIssuer/api/json`, {}, credentials);
+    const crumbData = JSON.parse(crumbBody);
+    crumbHeader = `${crumbData.crumbRequestField || 'Jenkins-Crumb'}:${crumbData.crumb}`;
+  } catch { /* ignore crumb failure */ }
+
+  const downloadPromise = new Promise<number>((resolve, reject) => {
     const isHttps = urlObj.protocol === 'https:';
     const lib = isHttps ? https : http;
 
-    const reqOptions = {
+    const headers: Record<string, string> = { 'Authorization': `Basic ${credentials}` };
+    if (crumbHeader) {
+      const [k, v] = crumbHeader.split(':');
+      headers[k] = v;
+    }
+
+    const reqOptions: http.RequestOptions = {
       hostname: urlObj.hostname,
       port: urlObj.port || (isHttps ? 443 : 80),
       path: urlObj.pathname + urlObj.search,
       method: 'GET',
-      headers: { 'Authorization': `Basic ${credentials}` },
-      rejectUnauthorized: false,
+      headers,
     };
 
     const req = lib.request(reqOptions, (res) => {
       if (res.statusCode === 302 || res.statusCode === 301) {
         const redirectUrl = res.headers.location!;
         downloadFile(redirectUrl, destPath, credentials).then(resolve).catch(reject);
+        return;
+      }
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
         return;
       }
       const writeStream = fs.createWriteStream(destPath);
@@ -104,9 +133,15 @@ function downloadFile(url: string, destPath: string, credentials: string): Promi
       });
       writeStream.on('error', reject);
     });
-    req.on('error', reject);
+    req.on('error', (err) => { reject(err); });
     req.end();
   });
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Download timeout after ${timeoutMs}ms: ${url}`)), timeoutMs)
+  );
+
+  return Promise.race([downloadPromise, timeoutPromise]);
 }
 
 // GET /api/admin/jenkins-config/:packageId - Get config for a package
@@ -156,12 +191,11 @@ router.post('/jenkins-config', authenticateToken, requireAdmin, (req: AuthReques
       updated.api_token = undefined;
       res.json(updated);
     } else {
-      const result = getDb().prepare(`
+      getDb().prepare(`
         INSERT INTO jenkins_configs (package_id, jenkins_url, job_name, username, api_token, artifact_pattern)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(package_id, jenkins_url, job_name, username, api_token, artifact_pattern || '*.zip');
-      const pkgId = Number(result.lastInsertRowid);
-      const inserted = getDb().prepare('SELECT * FROM jenkins_configs WHERE id = ?').get(pkgId) as any;
+      const inserted = getDb().prepare('SELECT * FROM jenkins_configs WHERE package_id = ?').get(package_id) as any;
       inserted.api_token = undefined;
       res.status(201).json(inserted);
     }
@@ -241,6 +275,8 @@ router.post('/jenkins-build/trigger-all', authenticateToken, requireAdmin, async
         status: 'pending',
         result: null,
         artifact_name: null,
+        artifact_names: [],
+        artifact_sizes: [],
         artifact_size: null,
         error: null,
         progress: 0,
@@ -290,22 +326,54 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
   let buildNumber: number | null = null;
   try {
     const { res: triggerRes } = await jenkinsRequest(
-      `${baseUrl}/job/${jobName}/build`,
-      { method: 'POST' },
+      `${baseUrl}/job/${jobName}/buildWithParameters`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `version=${encodeURIComponent(tagName)}`,
+      },
       credentials
     );
+    // Record trigger time to avoid using old completed builds in fallback
+    const triggerTime = Date.now();
+
     const location = triggerRes.headers.location as string | undefined;
     if (location) {
+      const queueUrl = new URL(location, baseUrl).href;
       let attempts = 0;
-      while (attempts < 30) {
+      while (attempts < 150) {
         await new Promise((r) => setTimeout(r, 2000));
         try {
-          const { body: queueBody } = await jenkinsRequest(`${baseUrl}${location}/api/json`, {}, credentials);
+          const { body: queueBody } = await jenkinsRequest(`${queueUrl}api/json`, {}, credentials);
           const queueData = JSON.parse(queueBody);
           if (!queueData.inQueue) {
             buildNumber = queueData.executable?.number ?? null;
             break;
           }
+        } catch { /* ignore */ }
+        attempts++;
+      }
+    }
+
+    // Fallback: if queue polling timed out, poll lastBuild but only accept builds triggered AFTER our trigger time
+    if (!buildNumber) {
+      let attempts = 0;
+      while (attempts < 300) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const { body: jobBody } = await jenkinsRequest(
+            `${baseUrl}/job/${jobName}/api/json?tree=lastBuild[number,result,building,timestamp]`,
+            {}, credentials
+          );
+          const jobData = JSON.parse(jobBody || '{}');
+          const lastBuild = jobData.lastBuild;
+          // Only accept this build if: not building, completed (result !== null), AND timestamp >= our trigger time
+          if (lastBuild && !lastBuild.building && lastBuild.result !== null && lastBuild.timestamp >= triggerTime) {
+            buildNumber = lastBuild.number;
+            console.log(`[Jenkins] fallback found new build: ${buildNumber} triggered after ${new Date(triggerTime).toISOString()}`);
+            break;
+          }
+          pkg.progress = 10 + Math.min(20, attempts * 0.1);
         } catch { /* ignore */ }
         attempts++;
       }
@@ -317,7 +385,17 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
     return;
   }
 
+  console.log(`[Jenkins] package=${pkg.package_name} buildNumber=${buildNumber} (from ${!buildNumber ? 'failed' : 'queue/fallback'})`);
+
   pkg.build_number = buildNumber;
+
+  if (!buildNumber) {
+    pkg.status = 'failed';
+    pkg.error = '无法获取 build number';
+    pkg.progress = 100;
+    return;
+  }
+
   pkg.status = 'building';
   pkg.progress = 30;
 
@@ -326,7 +404,7 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
   let artifacts: any[] = [];
   if (buildNumber) {
     let attempts = 0;
-    while (attempts < 120) {
+    while (attempts < 300) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
         const { body } = await jenkinsRequest(`${baseUrl}/job/${jobName}/${buildNumber}/api/json`, {}, credentials);
@@ -334,11 +412,12 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
         if (!data.building) {
           buildResult = data.result;
           artifacts = data.artifacts || [];
+          console.log(`[Jenkins] package=${pkg.package_name} build=${buildNumber} result=${buildResult} artifacts=${artifacts.length}`);
           pkg.progress = 60;
           break;
         }
         pkg.progress = 30 + Math.min(29, attempts * 0.5);
-      } catch { /* ignore */ }
+      } catch (e: any) { console.error(`[Jenkins] poll error: ${e.message}`); /* ignore */ }
       attempts++;
     }
   } else {
@@ -367,46 +446,76 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
   pkg.status = 'downloading';
   pkg.progress = 70;
 
-  // Step 3: Download artifact
+  // Step 3: Download all matched artifacts
   const pattern = config.artifact_pattern || '*.zip';
-  const matched = artifacts.find((a: any) => matchGlob(a.relativePath, pattern));
+  const matchedArtifacts = artifacts.filter((a: any) => matchGlob(a.relativePath, pattern));
 
-  if (!matched) {
+  if (matchedArtifacts.length === 0) {
     pkg.status = 'completed';
     pkg.artifact_name = null;
+    pkg.artifact_names = [];
+    pkg.artifact_sizes = [];
     pkg.error = `未找到匹配 "${pattern}" 的产物`;
     pkg.progress = 100;
     return;
   }
 
-  const artifactPath = matched.relativePath;
-  const artifactUrl = `${baseUrl}/job/${jobName}/${buildNumber}/artifact/${artifactPath}`;
-  const fileName = path.basename(artifactPath);
-  const localPath = path.join(uploadsDir, `${uuidv4()}_${fileName}`);
+  pkg.artifact_names = matchedArtifacts.map((a: any) => path.basename(a.relativePath));
 
-  try {
-    await downloadFile(artifactUrl, localPath, credentials);
-    const fileSize = fs.statSync(localPath).size;
+  // Create release first
+  getDb().prepare(
+    'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(config.package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
+  // Query by unique constraint (package_id + tag_name) to get the release ID
+  const release = getDb().prepare(
+    'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
+  ).get(config.package_id, tagName) as any;
+  const releaseId = release?.id;
+  console.log(`[Jenkins] release created: id=${releaseId} tag=${tagName} pkg=${config.package_id}`);
 
-    // Create release and asset
-    const releaseResult = getDb().prepare(
-      'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(config.package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
-    Number(releaseResult.lastInsertRowid);
+  // Download all matched artifacts sequentially
+  const total = matchedArtifacts.length;
+  const downloadedNames: string[] = [];
+  const downloadedSizes: number[] = [];
+  let failed = false;
 
-    getDb().prepare(
-      'INSERT INTO assets (release_id, name, size, file_path) VALUES (?, ?, ?, ?)'
-    ).run(releaseResult.lastInsertRowid, fileName, fileSize, localPath);
+  for (let idx = 0; idx < matchedArtifacts.length; idx++) {
+    const matched = matchedArtifacts[idx];
+    const artifactPath = matched.relativePath;
+    const artifactUrl = `${baseUrl}/job/${jobName}/${buildNumber}/artifact/${encodeURIComponent(artifactPath)}`;
+    const fileName = path.basename(artifactPath);
+    const localPath = path.join(uploadsDir, `${uuidv4()}_${fileName}`);
 
-    pkg.artifact_name = fileName;
-    pkg.artifact_size = fileSize;
-    pkg.status = 'completed';
-    pkg.progress = 100;
-  } catch (err: any) {
-    pkg.status = 'failed';
-    pkg.error = '下载产物失败: ' + err.message;
-    pkg.progress = 100;
+    try {
+      await downloadFile(artifactUrl, localPath, credentials);
+      const fileSize = fs.statSync(localPath).size;
+      getDb().prepare(
+        'INSERT INTO assets (release_id, name, size, file_path) VALUES (?, ?, ?, ?)'
+      ).run(releaseId, fileName, fileSize, localPath);
+      downloadedNames.push(fileName);
+      downloadedSizes.push(fileSize);
+    } catch (err: any) {
+      failed = true;
+      console.error(`[Jenkins] download error: ${fileName} - ${err.message}`);
+    }
+    pkg.progress = 70 + Math.round(((idx + 1) / total) * 30);
   }
+
+  pkg.artifact_name = downloadedNames[0] || null;
+  pkg.artifact_names = downloadedNames;
+  pkg.artifact_sizes = downloadedSizes;
+  pkg.artifact_size = downloadedSizes[0] || null;
+
+  if (failed && downloadedNames.length === 0) {
+    pkg.status = 'failed';
+    pkg.error = '所有产物下载失败';
+  } else {
+    pkg.status = 'completed';
+    if (failed) {
+      pkg.error = `部分产物下载失败: ${pkg.artifact_names.join(', ')}`;
+    }
+  }
+  pkg.progress = 100;
 }
 
 // GET /api/admin/jenkins-build/session/:sessionId
@@ -435,23 +544,32 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
     const baseUrl = config.jenkins_url.replace(/\/$/, '');
     const jobName = encodeURIComponent(config.job_name);
 
-    // Step 1: Trigger build
+    // Step 1: Trigger build with version parameter
     let buildNumber: number | null = null;
+    const latestRelease = getDb().prepare(
+      'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
+    ).get(package_id) as any;
+    const tagName = incrementVersion(latestRelease?.tag_name);
+
     try {
       const { res: triggerRes } = await jenkinsRequest(
-        `${baseUrl}/job/${jobName}/build`,
-        { method: 'POST' },
+        `${baseUrl}/job/${jobName}/buildWithParameters`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `version=${encodeURIComponent(tagName)}`,
+        },
         credentials
       );
 
       const location = triggerRes.headers.location as string | undefined;
       if (location) {
         // Poll queue to get actual build number
-        const queueUrl = location.replace(baseUrl, baseUrl);
+        const queueUrl = new URL(location, baseUrl).href;
         let attempts = 0;
-        while (attempts < 30) {
+        while (attempts < 150) {
           await new Promise(r => setTimeout(r, 2000));
-          const { body: queueBody } = await jenkinsRequest(`${baseUrl}${queueUrl}/api/json`, {}, credentials);
+          const { body: queueBody } = await jenkinsRequest(`${queueUrl}api/json`, {}, credentials);
           const queueData = JSON.parse(queueBody);
           if (!queueData.inQueue) {
             buildNumber = queueData.executable?.number ?? null;
@@ -460,31 +578,38 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
           attempts++;
         }
       }
+
+      // Fallback: try to get build number from job API
+      if (!buildNumber) {
+        try {
+          const { body: jobBody } = await jenkinsRequest(`${baseUrl}/job/${jobName}/api/json?tree=lastBuild[number,result]`, {}, credentials);
+          const jobData = JSON.parse(jobBody || '{}');
+          if (jobData.lastBuild && jobData.lastBuild.result !== null) {
+            buildNumber = jobData.lastBuild.number;
+          }
+        } catch { /* ignore */ }
+      }
     } catch (err: any) {
       return res.status(502).json({ error: '触发 Jenkins 构建失败: ' + err.message });
     }
 
     if (!buildNumber) {
-      // If we couldn't get build number, at least create a release with timestamp
-      const now = new Date();
-      const timestamp = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
-      const latestRelease = getDb().prepare(
-        'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
-      ).get(package_id) as any;
-      const tagName = incrementVersion(latestRelease?.tag_name);
-
-      const result = getDb().prepare(
+      // Couldn't get build number, create a release anyway
+      getDb().prepare(
         'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(package_id, tagName, `Build #${buildNumber || 'unknown'}`, '', 0, 0);
-      const releaseId = Number(result.lastInsertRowid);
+      ).run(package_id, tagName, `Build triggered`, '', 0, 0);
+      const release = getDb().prepare(
+        'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
+      ).get(package_id, tagName) as any;
+      const releaseId = release?.id;
 
-      return res.status(201).json({
+      return res.status(202).json({
         triggered: true,
         buildNumber: null,
         releaseId,
         tagName,
         status: 'queued',
-        message: '构建已触发，但无法获取 build number',
+        message: '构建已触发，等待 Jenkins 分配 build number',
       });
     }
 
@@ -492,7 +617,7 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
     let buildResult: string | null = null;
     let artifacts: any[] = [];
     let attempts = 0;
-    const maxAttempts = 120; // 2 min max
+    const maxAttempts = 400; // 10 min max
 
     while (attempts < maxAttempts) {
       await new Promise(r => setTimeout(r, 1500));
@@ -529,20 +654,18 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
       });
     }
 
-    // Step 3: Find matching artifact
+    // Step 3: Find all matching artifacts
     const pattern = config.artifact_pattern || '*.zip';
-    const matched = artifacts.find((a: any) => matchGlob(a.relativePath, pattern));
+    const matchedArtifacts = artifacts.filter((a: any) => matchGlob(a.relativePath, pattern));
 
-    if (!matched) {
-      // Create release without asset
-      const latestRelease = getDb().prepare(
-        'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
-      ).get(package_id) as any;
-      const tagName = incrementVersion(latestRelease?.tag_name);
-      const result = getDb().prepare(
+    if (matchedArtifacts.length === 0) {
+      getDb().prepare(
         'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
       ).run(package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
-      const releaseId = Number(result.lastInsertRowid);
+      const release = getDb().prepare(
+        'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
+      ).get(package_id, tagName) as any;
+      const releaseId = release?.id;
 
       return res.status(201).json({
         triggered: true,
@@ -555,45 +678,52 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
       });
     }
 
-    // Step 4: Download artifact
-    const artifactPath = matched.relativePath;
-    const artifactUrl = `${baseUrl}/job/${jobName}/${buildNumber}/artifact/${artifactPath}`;
-    const fileName = path.basename(artifactPath);
-    const localPath = path.join(uploadsDir, `${uuidv4()}_${fileName}`);
-
-    try {
-      await downloadFile(artifactUrl, localPath, credentials);
-    } catch (err: any) {
-      return res.status(502).json({ error: `下载产物失败: ${err.message}` });
-    }
-
-    const fileSize = fs.statSync(localPath).size;
-
-    // Step 5: Get or create release
-    const latestRelease = getDb().prepare(
-      'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
-    ).get(package_id) as any;
-    const tagName = incrementVersion(latestRelease?.tag_name);
-
-    const releaseResult = getDb().prepare(
+    // Step 4: Create release
+    getDb().prepare(
       'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
-    const releaseId = Number(releaseResult.lastInsertRowid);
+    const release = getDb().prepare(
+      'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
+    ).get(package_id, tagName) as any;
+    const releaseId = release?.id;
 
-    // Step 6: Create asset
-    getDb().prepare(
-      'INSERT INTO assets (release_id, name, size, file_path) VALUES (?, ?, ?, ?)'
-    ).run(releaseId, fileName, fileSize, localPath);
+    // Step 5: Download all matched artifacts sequentially
+    const downloaded: { name: string; size: number }[] = [];
+    let downloadFailed = false;
+
+    for (const matched of matchedArtifacts) {
+      const artifactPath = matched.relativePath;
+      const artifactUrl = `${baseUrl}/job/${jobName}/${buildNumber}/artifact/${encodeURIComponent(artifactPath)}`;
+      const fileName = path.basename(artifactPath);
+      const localPath = path.join(uploadsDir, `${uuidv4()}_${fileName}`);
+
+      try {
+        await downloadFile(artifactUrl, localPath, credentials);
+        const fileSize = fs.statSync(localPath).size;
+        getDb().prepare(
+          'INSERT INTO assets (release_id, name, size, file_path) VALUES (?, ?, ?, ?)'
+        ).run(releaseId, fileName, fileSize, localPath);
+        downloaded.push({ name: fileName, size: fileSize });
+      } catch (err: any) {
+        downloadFailed = true;
+        console.error(`[Jenkins] download failed: ${fileName} - ${err.message}`);
+      }
+    }
+
+    if (downloaded.length === 0) {
+      return res.status(502).json({ error: '所有产物下载失败' });
+    }
 
     res.status(201).json({
       triggered: true,
       buildNumber,
       result: 'SUCCESS',
-      status: 'completed',
+      status: downloadFailed ? 'partial' : 'completed',
       releaseId,
       tagName,
-      artifactName: fileName,
-      artifactSize: fileSize,
+      artifactNames: downloaded.map(d => d.name),
+      artifactSizes: downloaded.map(d => d.size),
+      message: downloadFailed ? '部分产物下载失败' : undefined,
     });
   } catch (err: any) {
     console.error('Jenkins trigger error:', err);

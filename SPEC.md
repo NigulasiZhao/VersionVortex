@@ -55,10 +55,10 @@ npm run dev
 ```
 
 访问地址：
-- 前台：http://localhost:5173
-- 登录：http://localhost:5173/login
-- 后台：http://localhost:5173/admin
-- API：http://localhost:8080
+- 前台：http://localhost:12005
+- 登录：http://localhost:12005/login
+- 后台：http://localhost:12005/admin
+- API：http://localhost:12006
 
 默认后台账号：`admin` / `admin123`
 

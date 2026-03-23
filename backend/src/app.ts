@@ -7,7 +7,7 @@ import adminRoutes from './routes/admin';
 import jenkinsRoutes from './routes/jenkins';
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 12006;
 
 app.use(cors());
 app.use(express.json());
