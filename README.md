@@ -9,6 +9,8 @@
 - Vite 4.x
 - React Router v6
 - TailwindCSS
+- Framer Motion 动画
+- Radix UI (Dialog, AlertDialog)
 
 ### 后端
 - Express + TypeScript
@@ -23,10 +25,11 @@ VersionManage/
 ├── frontend/                 # 前端应用
 │   └── src/
 │       ├── pages/           # 页面组件
-│       ├── components/      # 通用组件（含登录页动画组件）
+│       ├── components/      # 通用组件
+│       │   └── ui/         # UI 组件（Dialog, FormDialog, FluidDropdown 等）
 │       ├── services/        # API 服务
-│       ├── animations/      # 动画组件
-│       └── types/           # TypeScript 类型
+│       ├── types/           # TypeScript 类型
+│       └── lib/             # 工具函数
 ├── backend/                  # 后端应用
 │   └── src/
 │       ├── routes/          # 路由（admin.ts, public.ts, jenkins.ts）
@@ -65,9 +68,10 @@ npm run dev
 ## 功能特性
 
 ### 前台页面
-- 版本列表展示（支持按包名筛选）
+- 版本列表展示（支持按包名筛选，带动画下拉选择）
 - 版本详情页（变更日志、文件下载、下载次数统计）
 - 数据统计（版本数、软件包数、总下载次数）
+- 页面切换动画、滚动位置恢复
 
 ### 后台管理
 - 用户权限系统（admin / user 两种角色）
@@ -76,7 +80,8 @@ npm run dev
 - 软件包管理（每个包可独立配置 Jenkins）
 - 文件上传（最大 500MB）
 - 数据统计
-- **一键发版**: 触发所有已配置 Jenkins 的包，并行构建，实时显示每个包的构建进度
+- **一键发版**: 触发所有已配置 Jenkins 的包，并行构建，实时显示每个包的构建进度，会话持久化到数据库
+- 统一 UI 弹框组件（Dialog、FormDialog、SimpleDialog）
 
 ### 一键发版流程
 1. 在"软件包"标签中，为每个包配置 Jenkins（地址、Job名、用户名、API Token、产物匹配规则）
@@ -124,7 +129,10 @@ npm run dev
 | DELETE | /api/admin/jenkins-config/:packageId | 删除 Jenkins 配置 |
 | POST | /api/admin/jenkins-build/trigger-all | 触发所有包并行构建 |
 | GET | /api/admin/jenkins-build/session/:sessionId | 获取构建会话状态 |
+| GET | /api/admin/jenkins-build/active | 获取当前进行中的构建任务 |
 | GET | /api/admin/jenkins-build/history | 获取构建历史 |
+
+> 注意：一键发版任务会话持久化到数据库，刷新页面后自动恢复。
 
 ## 构建生产版本
 
