@@ -295,17 +295,55 @@ export default function AdminDashboard() {
     // 从数据库获取活动会话
     getJenkinsBuildActive()
       .then((activeSession) => {
-        if (activeSession && activeSession.overall_status === 'running') {
+        // 无论状态是什么，都获取最新状态并显示
+        if (activeSession) {
           setBuildSession(activeSession);
-          setBuildLoading(true);
           setIsPanelCollapsed(false);
 
-          // 延迟启动轮询以确保组件已准备就绪
-          setTimeout(() => {
-            if (pollBuildSessionRef.current) {
-              pollBuildSessionRef.current(activeSession.id);
+          // 如果状态是 running，继续轮询；否则显示完成状态
+          if (activeSession.overall_status === 'running') {
+            setBuildLoading(true);
+
+            // 直接启动轮询（不依赖 ref）
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
             }
-          }, 100);
+            pollIntervalRef.current = window.setInterval(async () => {
+              try {
+                const session = await getJenkinsBuildSession(activeSession.id);
+                setBuildSession(session);
+                if (session.overall_status !== 'running') {
+                  if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                  }
+                  setBuildLoading(false);
+                  localStorage.removeItem('build-session');
+                  localStorage.removeItem('build-loading');
+                  if (session.overall_status === 'completed') {
+                    load();
+                  }
+                }
+              } catch (err: any) {
+                if (err.response?.status === 404 || err.response?.status === 500) {
+                  if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                  }
+                  setBuildSession(null);
+                  setBuildLoading(false);
+                  localStorage.removeItem('build-session');
+                  localStorage.removeItem('build-loading');
+                }
+              }
+            }, 3000);
+          } else {
+            // 已完成或失败，也刷新数据
+            setBuildLoading(false);
+            if (activeSession.overall_status === 'completed') {
+              load();
+            }
+          }
         }
       })
       .catch(() => {

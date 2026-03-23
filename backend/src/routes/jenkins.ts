@@ -390,6 +390,7 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
 
   pkg.status = 'triggering';
   pkg.progress = 10;
+  saveBuildSessionToDb(session);
 
   const credentials = Buffer.from(`${config.username}:${config.api_token}`).toString('base64');
   const baseUrl = config.jenkins_url.replace(/\/$/, '');
@@ -455,6 +456,7 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
     pkg.status = 'failed';
     pkg.error = '触发失败: ' + err.message;
     pkg.progress = 100;
+    saveBuildSessionToDb(session);
     return;
   }
 
@@ -466,11 +468,13 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
     pkg.status = 'failed';
     pkg.error = '无法获取 build number';
     pkg.progress = 100;
+    saveBuildSessionToDb(session);
     return;
   }
 
   pkg.status = 'building';
   pkg.progress = 30;
+  saveBuildSessionToDb(session);
 
   // Step 2: Poll build status
   let buildResult: string | null = null;
@@ -497,6 +501,7 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
     pkg.status = 'failed';
     pkg.error = '无法获取 build number';
     pkg.progress = 100;
+    saveBuildSessionToDb(session);
     return;
   }
 
@@ -504,6 +509,7 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
     pkg.status = 'failed';
     pkg.error = '构建超时';
     pkg.progress = 100;
+    saveBuildSessionToDb(session);
     return;
   }
 
@@ -518,6 +524,7 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
   pkg.result = 'SUCCESS';
   pkg.status = 'downloading';
   pkg.progress = 70;
+  saveBuildSessionToDb(session);
 
   // Step 3: Download all matched artifacts
   const pattern = config.artifact_pattern || '*.zip';
@@ -530,6 +537,7 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
     pkg.artifact_sizes = [];
     pkg.error = `未找到匹配 "${pattern}" 的产物`;
     pkg.progress = 100;
+    saveBuildSessionToDb(session);
     return;
   }
 
