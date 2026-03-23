@@ -22,7 +22,8 @@ import {
 } from '../services/api';
 import type { Release, Package, AdminStats, User, JenkinsConfig, BuildSession } from '../types';
 import { ChevronDown, ChevronUp, Rocket, Loader2, CheckCircle2, XCircle, Clock, Download, AlertCircle } from 'lucide-react';
-import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { SimpleDialog } from '../components/ui/form-dialog';
+import { FormDialog } from '../components/ui/form-dialog';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('zh-CN', {
@@ -522,7 +523,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-canvas-default)' }}>
       {/* 删除确认弹框 */}
-      <ConfirmDialog
+      <SimpleDialog
         open={!!deleteConfirm}
         onOpenChange={(open) => !open && setDeleteConfirm(null)}
         title={
@@ -535,15 +536,29 @@ export default function AdminDashboard() {
           deleteConfirm?.type === 'package' ? '删除软件包将同时删除所有关联的版本，此操作不可撤销。' :
           '确定要删除该用户吗？'
         }
-        confirmText={deleting ? '删除中...' : '确认删除'}
-        onConfirm={() => {
-          if (deleteConfirm?.type === 'release') handleDeleteRelease();
-          else if (deleteConfirm?.type === 'package') handleDeletePackage();
-          else if (deleteConfirm?.type === 'user') handleDeleteUser();
-        }}
-        loading={!!deleting}
-        variant="destructive"
-      />
+      >
+        <div className="flex gap-2">
+          <button
+            onClick={() => setDeleteConfirm(null)}
+            className="flex-1 py-2 text-sm border rounded-lg transition-all"
+            style={{ borderColor: 'var(--color-border-default)', color: 'var(--color-fg-muted)' }}
+          >
+            取消
+          </button>
+          <button
+            onClick={() => {
+              if (deleteConfirm?.type === 'release') handleDeleteRelease();
+              else if (deleteConfirm?.type === 'package') handleDeletePackage();
+              else if (deleteConfirm?.type === 'user') handleDeleteUser();
+            }}
+            disabled={!!deleting}
+            className="flex-1 py-2 text-sm rounded-lg transition-all disabled:opacity-50"
+            style={{ background: '#F85149', color: 'white' }}
+          >
+            {deleting ? '删除中...' : '确认删除'}
+          </button>
+        </div>
+      </SimpleDialog>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Stats */}
@@ -806,76 +821,46 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
 
 function PackageModal({ onAdded }: { onAdded: (pkg: Package) => void }) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [homepage, setHomepage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleSubmit = async (values: Record<string, string>) => {
     setLoading(true);
     try {
-      const pkg = await createPackage({ name, description, homepage });
+      const pkg = await createPackage({
+        name: values.name,
+        description: values.description,
+        homepage: values.homepage
+      });
       onAdded(pkg);
-      setOpen(false);
-      setName('');
-      setDescription('');
-      setHomepage('');
-    } catch (err: any) {
-      setError(err.response?.data?.error || '创建失败');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="text-xs px-4 py-2 rounded-lg text-white transition-all animate-fade-in"
-                style={{ background: '#6C3FF5' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
-      >
-        + 新建软件包
-      </button>
-
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
-          <div className="w-full max-w-md border border-[var(--color-border-default)] rounded-xl" style={{ background: 'var(--color-canvas-subtle)' }}>
-            <div className="px-5 py-4 border-b border-[var(--color-border-default)] flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">新建软件包</h3>
-              <button onClick={() => setOpen(false)} className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm text-[var(--color-fg-default)] mb-1">名称 *</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} required className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]" style={{ background: 'var(--color-canvas-default)' }} />
-              </div>
-              <div>
-                <label className="block text-sm text-[var(--color-fg-default)] mb-1">描述</label>
-                <input value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]" style={{ background: 'var(--color-canvas-default)' }} />
-              </div>
-              <div>
-                <label className="block text-sm text-[var(--color-fg-default)] mb-1">主页</label>
-                <input value={homepage} onChange={(e) => setHomepage(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]" style={{ background: 'var(--color-canvas-default)' }} />
-              </div>
-              {error && <p className="text-xs text-[var(--color-danger-fg)]">{error}</p>}
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setOpen(false)} className="flex-1 py-2 text-sm border border-[var(--color-border-default)] rounded-lg text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all">取消</button>
-                <button type="submit" disabled={loading} className="flex-1 py-2 text-sm bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white rounded-lg transition-colors disabled:opacity-60">
-                  {loading ? '创建中...' : '创建'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
+    <FormDialog
+      open={open}
+      onOpenChange={setOpen}
+      title="新建软件包"
+      fields={[
+        { id: 'name', label: '名称', type: 'text', placeholder: '输入软件包名称', required: true },
+        { id: 'description', label: '描述', type: 'text', placeholder: '输入软件包描述' },
+        { id: 'homepage', label: '主页', type: 'url', placeholder: 'https://...' },
+      ]}
+      onSubmit={handleSubmit}
+      submitText="创建"
+      loading={loading}
+      trigger={
+        <button
+          className="text-xs px-4 py-2 rounded-lg text-white transition-all animate-fade-in"
+          style={{ background: '#6C3FF5' }}
+          onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+          onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
+        >
+          + 新建软件包
+        </button>
+      }
+    />
   );
 }
 
@@ -938,108 +923,58 @@ function UsersTable({ users, onDelete, deleting, onAdded }: {
 
 function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
   const [open, setOpen] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('user');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleSubmit = async (values: Record<string, string>) => {
     setLoading(true);
     try {
-      await createUser({ username, password, role });
+      await createUser({
+        username: values.username,
+        password: values.password,
+        role: values.role
+      });
       // Refresh the users list since API returns empty body
       const users = await getAdminUsers();
       onAdded(users[0]); // The newly created user will be first (sorted by created_at DESC)
-      setOpen(false);
-      setUsername('');
-      setPassword('');
-      setRole('user');
-    } catch (err: any) {
-      setError(err.response?.data?.error || '创建失败');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="text-xs px-4 py-2 rounded-lg text-white transition-all animate-fade-in"
-                style={{ background: '#6C3FF5' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
-      >
-        + 新建用户
-      </button>
-
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
-          <div className="w-full max-w-md border border-[var(--color-border-default)] rounded-xl" style={{ background: 'var(--color-canvas-subtle)' }}>
-            <div className="px-5 py-4 border-b border-[var(--color-border-default)] flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">新建用户</h3>
-              <button onClick={() => setOpen(false)} className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm text-[var(--color-fg-default)] mb-1">用户名 *</label>
-                <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none"
-                  style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
-                  placeholder="输入用户名"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-[var(--color-fg-default)] mb-1">密码 *</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none"
-                  style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
-                  placeholder="输入密码（至少6位）"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-[var(--color-fg-default)] mb-1">角色</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none"
-                  style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
-                >
-                  <option value="user">普通用户</option>
-                  <option value="admin">管理员</option>
-                </select>
-              </div>
-              {error && <p className="text-xs text-[var(--color-danger-fg)]">{error}</p>}
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setOpen(false)} className="flex-1 py-2 text-sm border border-[var(--color-border-default)] rounded-lg text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all">取消</button>
-                <button type="submit" disabled={loading} className="flex-1 py-2 text-sm bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white rounded-lg transition-colors disabled:opacity-60">
-                  {loading ? '创建中...' : '创建'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
+    <FormDialog
+      open={open}
+      onOpenChange={setOpen}
+      title="新建用户"
+      fields={[
+        { id: 'username', label: '用户名', type: 'text', placeholder: '输入用户名', required: true },
+        { id: 'password', label: '密码', type: 'password', placeholder: '输入密码（至少6位）', required: true },
+        {
+          id: 'role',
+          label: '角色',
+          type: 'select',
+          required: true,
+          defaultValue: 'user',
+          options: [
+            { value: 'user', label: '普通用户' },
+            { value: 'admin', label: '管理员' },
+          ]
+        },
+      ]}
+      onSubmit={handleSubmit}
+      submitText="创建"
+      loading={loading}
+      trigger={
+        <button
+          className="text-xs px-4 py-2 rounded-lg text-white transition-all animate-fade-in"
+          style={{ background: '#6C3FF5' }}
+          onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+          onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
+        >
+          + 新建用户
+        </button>
+      }
+    />
   );
 }
 
@@ -1050,31 +985,28 @@ function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }
   onDeleted: (pkgId: number) => void;
   onClose: () => void;
 }) {
-  const [jenkinsUrl, setJenkinsUrl] = useState(existingConfig?.jenkins_url || '');
-  const [jobName, setJobName] = useState(existingConfig?.job_name || '');
-  const [username, setUsername] = useState(existingConfig?.username || '');
-  const [apiToken, setApiToken] = useState(existingConfig?.api_token || '');
-  const [artifactPattern, setArtifactPattern] = useState(existingConfig?.artifact_pattern || '*.zip');
+  const [open, setOpen] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleClose = () => {
+    setOpen(false);
+    setTimeout(onClose, 200);
+  };
+
+  const handleSubmit = async (values: Record<string, string>) => {
     setLoading(true);
     try {
       const config = await saveJenkinsConfig({
         package_id: pkg.id,
-        jenkins_url: jenkinsUrl,
-        job_name: jobName,
-        username,
-        api_token: apiToken,
-        artifact_pattern: artifactPattern,
+        jenkins_url: values.jenkins_url,
+        job_name: values.job_name,
+        username: values.username,
+        api_token: values.api_token,
+        artifact_pattern: values.artifact_pattern,
       });
       onSaved(config);
-    } catch (err: any) {
-      setError(err.response?.data?.error || '保存失败');
+      handleClose();
     } finally {
       setLoading(false);
     }
@@ -1085,107 +1017,61 @@ function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }
     try {
       await deleteJenkinsConfig(pkg.id);
       onDeleted(pkg.id);
-    } catch (err: any) {
-      setError(err.response?.data?.error || '删除失败');
+      handleClose();
     } finally {
       setLoading(false);
     }
   };
 
+  const fields = [
+    { id: 'jenkins_url', label: 'Jenkins 地址', type: 'url' as const, placeholder: 'https://jenkins.example.com', required: true },
+    { id: 'job_name', label: 'Job 名称', type: 'text' as const, placeholder: 'my-app-build', required: true },
+    { id: 'username', label: '用户名', type: 'text' as const, placeholder: 'Jenkins 用户名', required: true },
+    { id: 'api_token', label: 'API Token', type: 'password' as const, placeholder: 'Jenkins 用户 API Token', required: true },
+    { id: 'artifact_pattern', label: '产物匹配规则', type: 'text' as const, placeholder: '*.zip', defaultValue: '*.zip' },
+  ];
+
+  const initialValues: Record<string, string> = {};
+  fields.forEach(f => {
+    initialValues[f.id] = f.id === 'artifact_pattern' ? (existingConfig?.artifact_pattern || '*.zip') :
+      existingConfig?.[f.id as keyof JenkinsConfig] as string || '';
+  });
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
-      <div className="w-full max-w-md border border-[var(--color-border-default)] rounded-xl" style={{ background: 'var(--color-canvas-subtle)' }}>
-        <div className="px-5 py-4 border-b border-[var(--color-border-default)] flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">配置 Jenkins 发版</h3>
-            <p className="text-xs text-[var(--color-fg-muted)] mt-0.5">{pkg.name}</p>
-          </div>
-          <button onClick={onClose} className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className="block text-sm text-[var(--color-fg-default)] mb-1">Jenkins 地址 *</label>
-            <input
-              value={jenkinsUrl}
-              onChange={(e) => setJenkinsUrl(e.target.value)}
-              required
-              placeholder="https://jenkins.example.com"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
-              style={{ background: 'var(--color-canvas-default)' }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--color-fg-default)] mb-1">Job 名称 *</label>
-            <input
-              value={jobName}
-              onChange={(e) => setJobName(e.target.value)}
-              required
-              placeholder="my-app-build"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
-              style={{ background: 'var(--color-canvas-default)' }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--color-fg-default)] mb-1">用户名 *</label>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              placeholder="Jenkins 用户名"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
-              style={{ background: 'var(--color-canvas-default)' }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--color-fg-default)] mb-1">API Token *</label>
-            <input
-              type="password"
-              value={apiToken}
-              onChange={(e) => setApiToken(e.target.value)}
-              required
-              placeholder="Jenkins 用户 API Token"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
-              style={{ background: 'var(--color-canvas-default)' }}
-            />
-            <p className="text-xs text-[var(--color-fg-muted)] mt-1">
-              在 Jenkins 用户设置页生成：Jenkins → 用户 → Configure → API Token
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--color-fg-default)] mb-1">产物匹配规则</label>
-            <input
-              value={artifactPattern}
-              onChange={(e) => setArtifactPattern(e.target.value)}
-              placeholder="*.zip"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
-              style={{ background: 'var(--color-canvas-default)' }}
-            />
-            <p className="text-xs text-[var(--color-fg-muted)] mt-1">
-              支持通配符，如 <code className="px-1 rounded bg-[var(--color-canvas-default)]">*.zip</code> 或 <code className="px-1 rounded bg-[var(--color-canvas-default)]">app-*.zip</code>
-            </p>
-          </div>
-          {error && <p className="text-xs text-[var(--color-danger-fg)]">{error}</p>}
-          <div className="flex gap-3 pt-2">
-            {existingConfig && (
-              !showDeleteConfirm ? (
-                <button type="button" onClick={() => setShowDeleteConfirm(true)} className="flex-1 py-2 text-sm border border-[var(--color-danger-fg)] rounded-lg text-[var(--color-danger-fg)] hover:bg-[rgba(248,81,73,0.1)] transition-all">
-                  删除配置
-                </button>
-              ) : (
-                <button type="button" onClick={handleDelete} disabled={loading} className="flex-1 py-2 text-sm border border-[var(--color-danger-fg)] rounded-lg text-[var(--color-danger-fg)] hover:bg-[rgba(248,81,73,0.1)] transition-all">
-                  确认删除？
-                </button>
-              )
+    <FormDialog
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && handleClose()}
+      title="配置 Jenkins 发版"
+      description={pkg.name}
+      fields={fields}
+      defaultValues={initialValues}
+      onSubmit={handleSubmit}
+      submitText="保存"
+      loading={loading}
+      extraFooter={
+        existingConfig && (
+          <div className="flex gap-2 w-full">
+            {!showDeleteConfirm ? (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex-1 py-2 text-sm border border-[var(--color-danger-fg)] rounded-lg text-[var(--color-danger-fg)] hover:bg-[rgba(248,81,73,0.1)] transition-all"
+              >
+                删除配置
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={loading}
+                className="flex-1 py-2 text-sm border border-[var(--color-danger-fg)] rounded-lg text-[var(--color-danger-fg)] hover:bg-[rgba(248,81,73,0.1)] transition-all"
+              >
+                确认删除？
+              </button>
             )}
-            <button type="button" onClick={onClose} className="flex-1 py-2 text-sm border border-[var(--color-border-default)] rounded-lg text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all">取消</button>
-            <button type="submit" disabled={loading} className="flex-1 py-2 text-sm bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white rounded-lg transition-colors disabled:opacity-60">
-              {loading ? '保存中...' : '保存'}
-            </button>
           </div>
-        </form>
-      </div>
-    </div>
+        )
+      }
+    />
   );
 }
