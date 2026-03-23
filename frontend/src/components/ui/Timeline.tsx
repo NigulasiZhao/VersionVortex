@@ -143,7 +143,7 @@ function ReleaseCard({ release, isLatest }) {
   );
 }
 
-export function Timeline({ releases, packages }) {
+export function Timeline({ releases, packages, className = "" }) {
   const [selectedPackage, setSelectedPackage] = useState("all");
 
   const filteredReleases =
@@ -160,7 +160,7 @@ export function Timeline({ releases, packages }) {
   ];
 
   return (
-    <div>
+    <div className={className}>
       <div>
         <FluidDropdown
           options={dropdownOptions}

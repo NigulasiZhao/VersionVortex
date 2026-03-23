@@ -164,7 +164,7 @@ export default function Home() {
             <p style={{ color: "var(--color-fg-muted)" }}>暂无版本</p>
           </div>
         ) : (
-          <Timeline releases={filtered} packages={packages} />
+          <Timeline releases={filtered} packages={packages} className="mt-4" />
         )}
       </div>
     </div>
