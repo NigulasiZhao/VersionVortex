@@ -109,16 +109,13 @@ body::before {
   overflow: hidden;
 }
 
-/* 大粒子 - 缓慢漂浮 - 发光球体效果 */
+/* 大粒子 - 缓慢漂浮 - 柔和光晕 */
 .particle-large {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(108,63,245,0.4) 40%, rgba(108,63,245,0) 70%);
-  box-shadow:
-    0 0 8px 2px rgba(108, 63, 245, 0.3),
-    0 0 20px 6px rgba(108, 63, 245, 0.15);
+  background: radial-gradient(circle, rgba(108,63,245,0.5) 0%, rgba(108,63,245,0.15) 60%, transparent 100%);
   animation: float-glow-1 20s ease-in-out infinite;
 }
 
@@ -143,14 +140,13 @@ body::before {
 .particle-large:nth-child(19) { left: 78%; top: 92%; animation-delay: -4s; animation-duration: 22s; }
 .particle-large:nth-child(20) { left: 95%; top: 75%; animation-delay: -6s; animation-duration: 21s; }
 
-/* 中粒子 - 呼吸效果 - 发光小球 */
+/* 中粒子 - 呼吸效果 - 柔和光点 */
 .particle-medium {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), rgba(139,92,246,0.5) 50%, rgba(139,92,246,0) 80%);
-  box-shadow: 0 0 6px 2px rgba(139, 92, 246, 0.25);
+  background: radial-gradient(circle, rgba(139,92,246,0.5) 0%, rgba(139,92,246,0.1) 70%, transparent 100%);
   animation: breathe-glow 4s ease-in-out infinite;
 }
 
@@ -180,14 +176,13 @@ body::before {
 .particle-medium:nth-child(24) { left: 42%; top: 8%; animation-delay: 3.1s; }
 .particle-medium:nth-child(25) { left: 95%; top: 58%; animation-delay: 2.1s; }
 
-/* 小粒子 - 快速闪烁 - 微光点 */
+/* 小粒子 - 快速闪烁 - 微弱光点 */
 .particle-small {
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), rgba(167,139,250,0.6) 40%, rgba(167,139,250,0) 70%);
-  box-shadow: 0 0 4px 1px rgba(167, 139, 250, 0.2);
+  background: rgba(167,139,250,0.4);
   animation: twinkle-glow 2s ease-in-out infinite;
 }
 
@@ -222,24 +217,24 @@ body::before {
 .particle-small:nth-child(29) { left: 6%; top: 92%; animation-delay: 1.75s; }
 .particle-small:nth-child(30) { left: 34%; top: 98%; animation-delay: 1.95s; }
 
-/* 大粒子漂浮动画 - 带发光呼吸 */
+/* 大粒子漂浮动画 - 柔和运动 */
 @keyframes float-glow-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
-  25% { transform: translate(30px, -20px) scale(1.1); opacity: 0.8; }
-  50% { transform: translate(-15px, -40px) scale(0.95); opacity: 0.6; }
-  75% { transform: translate(-35px, -15px) scale(1.05); opacity: 0.9; }
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  25% { transform: translate(30px, -20px); opacity: 0.6; }
+  50% { transform: translate(-15px, -40px); opacity: 0.5; }
+  75% { transform: translate(-35px, -15px); opacity: 0.7; }
 }
 
-/* 中粒子呼吸发光动画 */
+/* 中粒子呼吸动画 */
 @keyframes breathe-glow {
-  0%, 100% { opacity: 0.4; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.3); }
+  0%, 100% { opacity: 0.3; transform: scale(0.9); }
+  50% { opacity: 0.7; transform: scale(1.1); }
 }
 
-/* 小粒子闪烁发光动画 */
+/* 小粒子闪烁动画 */
 @keyframes twinkle-glow {
-  0%, 100% { opacity: 0.3; transform: scale(0.7); }
-  50% { opacity: 1; transform: scale(1.2); }
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.5; }
 }
 
 a {
