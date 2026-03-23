@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import Layout from './components/Layout';
+import { Particles } from './components/Particles';
 import Home from './pages/Home';
 import ReleaseDetail from './pages/ReleaseDetail';
 import AdminLogin from './pages/AdminLogin';
@@ -166,6 +167,7 @@ function AnimatedRoutes() {
 function App() {
   return (
     <BrowserRouter>
+      <Particles />
       <AnimatedRoutes />
     </BrowserRouter>
   );
