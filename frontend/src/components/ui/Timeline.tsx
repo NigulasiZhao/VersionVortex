@@ -169,7 +169,8 @@ export function Timeline({ releases, packages, className = "" }) {
         />
       </div>
 
-      <AnimatePresence mode="popLayout">
+      <div className="mt-4">
+        <AnimatePresence mode="popLayout">
         {filteredReleases.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -237,6 +238,7 @@ export function Timeline({ releases, packages, className = "" }) {
         </div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }
