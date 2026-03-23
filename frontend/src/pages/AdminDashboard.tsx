@@ -22,6 +22,7 @@ import {
 } from '../services/api';
 import type { Release, Package, AdminStats, User, JenkinsConfig, BuildSession } from '../types';
 import { ChevronDown, ChevronUp, Rocket, Loader2, CheckCircle2, XCircle, Clock, Download, AlertCircle } from 'lucide-react';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('zh-CN', {
@@ -263,6 +264,14 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
 
+  // 删除确认弹框状态
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    type: 'release' | 'package' | 'user';
+    id: number;
+    name: string;
+  } | null>(null);
+
   // 一键发版状态
   const [buildSession, setBuildSession] = useState<BuildSession | null>(null);
   const [buildLoading, setBuildLoading] = useState(false);
@@ -376,42 +385,45 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleDeleteRelease = async (id: number) => {
-    if (!confirm('确定要删除此版本吗？此操作不可撤销。')) return;
-    setDeleting(id);
+  const handleDeleteRelease = async () => {
+    if (!deleteConfirm || deleteConfirm.type !== 'release') return;
+    setDeleting(deleteConfirm.id);
     try {
-      await deleteRelease(id);
-      setReleases((prev) => prev.filter((r) => r.id !== id));
+      await deleteRelease(deleteConfirm.id);
+      setReleases((prev) => prev.filter((r) => r.id !== deleteConfirm.id));
     } catch {
       alert('删除失败');
     } finally {
       setDeleting(null);
+      setDeleteConfirm(null);
     }
   };
 
-  const handleDeletePackage = async (id: number) => {
-    if (!confirm('确定要删除此包吗？这将同时删除所有关联版本。')) return;
-    setDeleting(id);
+  const handleDeletePackage = async () => {
+    if (!deleteConfirm || deleteConfirm.type !== 'package') return;
+    setDeleting(deleteConfirm.id);
     try {
-      await deletePackage(id);
-      setPackages((prev) => prev.filter((p) => p.id !== id));
+      await deletePackage(deleteConfirm.id);
+      setPackages((prev) => prev.filter((p) => p.id !== deleteConfirm.id));
     } catch {
       alert('删除失败');
     } finally {
       setDeleting(null);
+      setDeleteConfirm(null);
     }
   };
 
-  const handleDeleteUser = async (id: number) => {
-    if (!confirm('确定要删除此用户吗？')) return;
-    setDeleting(id);
+  const handleDeleteUser = async () => {
+    if (!deleteConfirm || deleteConfirm.type !== 'user') return;
+    setDeleting(deleteConfirm.id);
     try {
-      await deleteUser(id);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      await deleteUser(deleteConfirm.id);
+      setUsers((prev) => prev.filter((u) => u.id !== deleteConfirm.id));
     } catch (err: any) {
       alert(err.response?.data?.error || '删除失败');
     } finally {
       setDeleting(null);
+      setDeleteConfirm(null);
     }
   };
 
@@ -509,6 +521,30 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-canvas-default)' }}>
+      {/* 删除确认弹框 */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        title={
+          deleteConfirm?.type === 'release' ? '确定删除版本？' :
+          deleteConfirm?.type === 'package' ? '确定删除软件包？' :
+          '确定删除用户？'
+        }
+        description={
+          deleteConfirm?.type === 'release' ? '此操作不可撤销，删除后该版本将从系统中永久移除。' :
+          deleteConfirm?.type === 'package' ? '删除软件包将同时删除所有关联的版本，此操作不可撤销。' :
+          '确定要删除该用户吗？'
+        }
+        confirmText={deleting ? '删除中...' : '确认删除'}
+        onConfirm={() => {
+          if (deleteConfirm?.type === 'release') handleDeleteRelease();
+          else if (deleteConfirm?.type === 'package') handleDeletePackage();
+          else if (deleteConfirm?.type === 'user') handleDeleteUser();
+        }}
+        loading={!!deleting}
+        variant="destructive"
+      />
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Stats */}
         {stats && (
@@ -581,21 +617,21 @@ export default function AdminDashboard() {
           {tab === 'releases' ? (
             <ReleasesTable
               releases={releases}
-              onDelete={handleDeleteRelease}
+              onDelete={(id) => setDeleteConfirm({ open: true, type: 'release', id, name: '' })}
               deleting={deleting}
             />
           ) : tab === 'packages' ? (
             <PackagesTable
               packages={packages}
               jenkinsConfigs={jenkinsConfigs}
-              onDelete={handleDeletePackage}
+              onDelete={(id) => setDeleteConfirm({ open: true, type: 'package', id, name: '' })}
               deleting={deleting}
               onConfigJenkins={(pkg) => setJenkinsConfigModal({ open: true, pkg })}
             />
           ) : (
             <UsersTable
               users={users}
-              onDelete={handleDeleteUser}
+              onDelete={(id) => setDeleteConfirm({ open: true, type: 'user', id, name: '' })}
               deleting={deleting}
               onAdded={(user) => setUsers((prev) => [...prev, user])}
             />
