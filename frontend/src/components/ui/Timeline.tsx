@@ -161,7 +161,7 @@ export function Timeline({ releases, packages }) {
 
   return (
     <div>
-      <div className="sticky top-16 z-30 py-4" style={{ background: "transparent", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}>
+      <div className="py-4">
         <FluidDropdown
           options={dropdownOptions}
           value={selectedPackage}
