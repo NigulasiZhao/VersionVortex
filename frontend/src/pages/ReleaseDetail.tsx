@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { getRelease, downloadAsset } from '../services/api';
 import type { Release } from '../types';
 import { ArrowLeft, Download, ExternalLink } from 'lucide-react';
@@ -50,6 +50,7 @@ function parseMarkdown(text: string) {
 
 export default function ReleaseDetail() {
   const { tag } = useParams();
+  const location = useLocation();
   const [release, setRelease] = useState<Release | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -72,10 +73,6 @@ export default function ReleaseDetail() {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 flex items-center justify-center relative">
-        {/* Animated background */}
-        <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute w-[500px] h-[500px] rounded-full animate-float-1" style={{ background: 'radial-gradient(circle at center, rgba(108,63,245,0.08) 0%, transparent 70%)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
-        </div>
         <div className="w-10 h-10 border-2 border-[#6C3FF5] border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -84,17 +81,13 @@ export default function ReleaseDetail() {
   if (error || !release) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center relative">
-        {/* Animated background */}
-        <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute w-[400px] h-[400px] rounded-full animate-float-1" style={{ background: 'radial-gradient(circle at center, rgba(108,63,245,0.06) 0%, transparent 70%)', top: '30%', left: '50%', transform: 'translate(-50%, -50%)' }} />
-        </div>
         <div className="relative z-10">
           <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--color-canvas-subtle) 0%, rgba(108,63,245,0.1) 100%)' }}>
             <span className="text-3xl">🔍</span>
           </div>
           <h1 className="text-xl font-bold mb-2">版本未找到</h1>
           <p className="text-[var(--color-fg-muted)] mb-4">抱歉，找不到该版本的信息</p>
-          <Link to="/" className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-lg text-white transition-all" style={{ background: '#6C3FF5' }}>
+          <Link to="/" state={{ fromDetail: true }} className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-lg text-white transition-all" style={{ background: '#6C3FF5' }}>
             <ArrowLeft className="w-4 h-4" />
             返回版本列表
           </Link>
@@ -105,28 +98,8 @@ export default function ReleaseDetail() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 relative">
-      {/* Animated background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        {/* Gradient orbs */}
-        <div className="absolute w-[500px] h-[500px] rounded-full animate-float-1" style={{ background: 'radial-gradient(circle at center, rgba(108,63,245,0.08) 0%, transparent 70%)', top: '-100px', right: '-100px' }} />
-        <div className="absolute w-[400px] h-[400px] rounded-full animate-float-2" style={{ background: 'radial-gradient(circle at center, rgba(139,92,246,0.06) 0%, transparent 70%)', bottom: '20%', left: '-100px' }} />
-        <div className="absolute w-[300px] h-[300px] rounded-full animate-float-3" style={{ background: 'radial-gradient(circle at center, rgba(167,139,250,0.05) 0%, transparent 70%)', bottom: '10%', right: '10%' }} />
-
-        {/* Grid pattern */}
-        <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: 'linear-gradient(#6C3FF5 1px, transparent 1px), linear-gradient(90deg, #6C3FF5 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-
-        {/* Floating dots */}
-        <div className="absolute w-1.5 h-1.5 rounded-full animate-float-1" style={{ background: 'rgba(108,63,245,0.3)', top: '20%', left: '15%' }} />
-        <div className="absolute w-1 h-1 rounded-full animate-float-2" style={{ background: 'rgba(139,92,246,0.4)', top: '35%', left: '25%' }} />
-        <div className="absolute w-2 h-2 rounded-full animate-float-3" style={{ background: 'rgba(108,63,245,0.2)', bottom: '40%', right: '15%' }} />
-        <div className="absolute w-1 h-1 rounded-full animate-float-1" style={{ background: 'rgba(167,139,250,0.5)', bottom: '25%', right: '25%', animationDelay: '0.5s' }} />
-      </div>
-
       {/* Content */}
       <div className="relative z-10">
-        {/* Top accent bar */}
-        <div className="h-1.5 rounded-full mb-6 animate-gradient" style={{ background: 'linear-gradient(90deg, #6C3FF5, #A78BFA, #C4B5FD, #6C3FF5)', backgroundSize: '200% auto' }} />
-
         {/* Back */}
         <Link to="/" className="inline-flex items-center gap-1 text-sm text-[var(--color-fg-muted)] hover:text-[#6C3FF5] mb-6 no-underline transition-colors animate-fade-in">
           <ArrowLeft className="w-4 h-4" />

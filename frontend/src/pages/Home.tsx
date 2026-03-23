@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { useParams } from "react-router-dom";
 import { getReleases, getPackages, getStats } from "../services/api";
 import type { Release, Package } from "../types";
@@ -12,104 +12,79 @@ export default function Home() {
   const [stats, setStats] = useState<any>(null);
   const [selectedPackage, setSelectedPackage] = useState<string>(packageName || "all");
   const [loading, setLoading] = useState(true);
+  const [scrollRestored, setScrollRestored] = useState(false);
 
+  // Data loading - use cache from sessionStorage
   useEffect(() => {
-    Promise.all([getReleases(), getPackages(), getStats()])
-      .then(([r, p, s]) => {
+    const cachedData = sessionStorage.getItem('home-cache');
+    if (cachedData) {
+      try {
+        const { releases: r, packages: p, stats: s } = JSON.parse(cachedData);
         setReleases(r);
         setPackages(p);
         setStats(s);
-      })
-      .finally(() => setLoading(false));
+        setLoading(false);
+      } catch {
+        // Cache invalid, fetch from API
+        loadData();
+      }
+    } else {
+      loadData();
+    }
+
+    function loadData() {
+      Promise.all([getReleases(), getPackages(), getStats()])
+        .then(([r, p, s]) => {
+          setReleases(r);
+          setPackages(p);
+          setStats(s);
+          // Cache data
+          sessionStorage.setItem('home-cache', JSON.stringify({ releases: r, packages: p, stats: s }));
+        })
+        .finally(() => setLoading(false));
+    }
   }, []);
+
+  // Restore scroll position when returning from detail page
+  useLayoutEffect(() => {
+    if (loading) return;
+
+    const savedPosition = sessionStorage.getItem('home-scroll-position');
+    if (savedPosition) {
+      window.scrollTo(0, parseFloat(savedPosition));
+      sessionStorage.removeItem('home-scroll-position');
+      setScrollRestored(true);
+    }
+  }, [loading]);
 
   const filtered =
     selectedPackage === "all"
       ? releases
       : releases.filter((r) => r.package_name === selectedPackage);
 
+  // Smooth fade-in when data loads
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => setVisible(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
+
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-16 flex items-center justify-center relative">
-        {/* Animated background */}
-        <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          <div
-            className="absolute w-[500px] h-[500px] rounded-full animate-float-1"
-            style={{
-              background: "radial-gradient(circle at center, rgba(108,63,245,0.08) 0%, transparent 70%)",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-            }}
-          />
-        </div>
-        <div className="text-center relative z-10">
-          <div className="w-10 h-10 border-2 border-[#6C3FF5] border-t-transparent rounded-full mx-auto mb-3 animate-spin" />
-          <p className="text-[var(--color-fg-muted)] text-sm">加载中...</p>
-        </div>
-      </div>
+      <div className="max-w-5xl mx-auto px-4 py-16" />
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 relative">
-      {/* Animated background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        {/* Gradient orbs */}
-        <div
-          className="absolute w-[600px] h-[600px] rounded-full animate-float-1"
-          style={{
-            background: "radial-gradient(circle at center, rgba(108,63,245,0.08) 0%, transparent 70%)",
-            top: "-200px",
-            left: "-200px",
-          }}
-        />
-        <div
-          className="absolute w-[500px] h-[500px] rounded-full animate-float-2"
-          style={{
-            background: "radial-gradient(circle at center, rgba(139,92,246,0.06) 0%, transparent 70%)",
-            top: "30%",
-            right: "-150px",
-          }}
-        />
-        <div
-          className="absolute w-[400px] h-[400px] rounded-full animate-float-3"
-          style={{
-            background: "radial-gradient(circle at center, rgba(167,139,250,0.05) 0%, transparent 70%)",
-            bottom: "10%",
-            left: "20%",
-          }}
-        />
-
-        {/* Grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.015]"
-          style={{
-            backgroundImage:
-              "linear-gradient(#6C3FF5 1px, transparent 1px), linear-gradient(90deg, #6C3FF5 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-
-        {/* Floating dots */}
-        <div className="absolute w-1.5 h-1.5 rounded-full animate-float-1" style={{ background: "rgba(108,63,245,0.3)", top: "15%", right: "15%" }} />
-        <div className="absolute w-1 h-1 rounded-full animate-float-2" style={{ background: "rgba(139,92,246,0.4)", top: "25%", right: "25%" }} />
-        <div className="absolute w-2 h-2 rounded-full animate-float-3" style={{ background: "rgba(108,63,245,0.2)", top: "60%", right: "10%" }} />
-        <div className="absolute w-1 h-1 rounded-full animate-float-1" style={{ background: "rgba(167,139,250,0.5)", bottom: "30%", right: "20%", animationDelay: "1s" }} />
-        <div className="absolute w-1.5 h-1.5 rounded-full animate-float-2" style={{ background: "rgba(108,63,245,0.25)", bottom: "20%", left: "10%" }} />
-      </div>
-
+    <div className={`max-w-5xl mx-auto px-4 py-8 relative transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}>
       {/* Content */}
       <div className="relative z-10">
-        {/* Top accent bar */}
-        <div
-          className="h-1.5 rounded-full mb-8 animate-gradient"
-          style={{ background: "linear-gradient(90deg, #6C3FF5, #A78BFA, #C4B5FD, #6C3FF5)", backgroundSize: "200% auto" }}
-        />
-
         {/* Hero */}
         <div
-          className="mb-8 py-6 px-6 rounded-2xl border animate-fade-in"
+          className="mb-8 py-6 px-6 rounded-2xl border"
           style={{
             background: "linear-gradient(135deg, var(--color-canvas-subtle) 0%, rgba(108,63,245,0.04) 100%)",
             borderColor: "var(--color-border-default)",

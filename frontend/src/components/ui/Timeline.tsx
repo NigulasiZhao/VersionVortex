@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Download, ChevronDown } from "lucide-react";
+import { Download } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { FluidDropdown } from "./FluidDropdown";
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("zh-CN", {
@@ -47,9 +49,15 @@ function ReleaseCard({ release, isLatest }) {
   const isDraft = release.is_draft === 1;
   const totalDownloads = release.total_downloads;
 
+  // Save scroll position before navigating
+  const handleClick = () => {
+    sessionStorage.setItem('home-scroll-position', window.scrollY.toString());
+  };
+
   return (
     <Link
       to={`/releases/${release.tag_name}`}
+      onClick={handleClick}
       className="block border rounded-xl p-5 transition-all duration-300 hover:border-[#6C3FF5] group"
       style={{
         borderColor: "var(--color-border-default)",
@@ -145,42 +153,44 @@ export function Timeline({ releases, packages }) {
 
   const monthGroups = groupByMonth(filteredReleases);
 
+  // Prepare dropdown options
+  const dropdownOptions = [
+    { id: "all", label: "全部软件包" },
+    ...packages.map((pkg) => ({ id: pkg.name, label: pkg.name })),
+  ];
+
   return (
     <div>
-      <div className="sticky top-16 z-30 py-4" style={{ background: "var(--color-canvas-default)" }}>
-        <div className="relative inline-block">
-          <select
-            value={selectedPackage}
-            onChange={(e) => setSelectedPackage(e.target.value)}
-            className="appearance-none px-4 py-2 pr-10 rounded-xl border cursor-pointer text-sm"
-            style={{
-              background: "var(--color-canvas-subtle)",
-              borderColor: "var(--color-border-default)",
-              color: "var(--color-fg-default)",
-            }}
-          >
-            <option value="all">全部软件包</option>
-            {packages.map((pkg) => (
-              <option key={pkg.id} value={pkg.name}>
-                {pkg.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-            style={{ color: "var(--color-fg-muted)" }}
-          />
-        </div>
+      <div className="sticky top-16 z-30 py-4" style={{ background: "transparent", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}>
+        <FluidDropdown
+          options={dropdownOptions}
+          value={selectedPackage}
+          onChange={setSelectedPackage}
+        />
       </div>
 
-      {filteredReleases.length === 0 ? (
-        <div className="text-center py-16" style={{ color: "var(--color-fg-muted)" }}>
-          暂无版本
-        </div>
-      ) : (
-        <div className="relative">
-          {monthGroups.map((group, groupIndex) => (
-            <div key={group.key} className="flex gap-8 mb-12 last:mb-0">
+      <AnimatePresence mode="popLayout">
+        {filteredReleases.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-center py-16"
+            style={{ color: "var(--color-fg-muted)" }}
+          >
+            暂无版本
+          </motion.div>
+        ) : (
+          <div className="relative">
+            {monthGroups.map((group, groupIndex) => (
+              <motion.div
+                key={group.key}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="flex gap-8 mb-12 last:mb-0"
+              >
               <div className="hidden md:block w-40 shrink-0">
                 <div
                   className="text-2xl font-bold tracking-tight"
@@ -222,10 +232,11 @@ export function Timeline({ releases, packages }) {
                   ))}
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }
