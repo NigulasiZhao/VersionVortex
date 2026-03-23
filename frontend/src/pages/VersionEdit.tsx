@@ -10,6 +10,7 @@ import {
   getRelease,
 } from '../services/api';
 import type { Package, Release, Asset } from '../types';
+import { ArrowLeft, Upload } from 'lucide-react';
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B';
@@ -116,7 +117,7 @@ export default function VersionEdit() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-canvas-default)' }}>
-        <div className="animate-spin w-8 h-8 border-2 border-[var(--color-accent-emphasis)] border-t-transparent rounded-full" />
+        <div className="animate-spin w-8 h-8 border-2 border-[#6C3FF5] border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -124,10 +125,10 @@ export default function VersionEdit() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-canvas-default)' }}>
       {/* Header */}
-      <header className="border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
+      <header className="border-b border-[var(--color-border-default)]" style={{ background: 'var(--color-canvas-default)' }}>
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center gap-4">
-          <Link to="/admin" className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)] no-underline flex items-center gap-1">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>
+          <Link to="/admin" className="text-[var(--color-fg-muted)] hover:text-[#6C3FF5] no-underline flex items-center gap-1 transition-colors">
+            <ArrowLeft className="w-4 h-4" />
             返回
           </Link>
           <span className="text-[var(--color-fg-muted)]">/</span>
@@ -139,20 +140,23 @@ export default function VersionEdit() {
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {error && (
-          <div className="mb-4 text-sm text-[var(--color-danger-fg)] bg-[rgba(248,81,73,0.1)] border border-[rgba(248,81,73,0.3)] rounded-lg px-4 py-3">
+          <div className="mb-4 text-sm text-[var(--color-danger-fg)] bg-[rgba(248,81,73,0.1)] border border-[rgba(248,81,73,0.3)] rounded-lg px-4 py-3 animate-fade-in">
             {error}
           </div>
         )}
         {success && (
-          <div className="mb-4 text-sm text-[var(--color-success-fg)] bg-[rgba(63,185,80,0.1)] border border-[rgba(63,185,80,0.3)] rounded-lg px-4 py-3">
+          <div className="mb-4 text-sm border rounded-lg px-4 py-3 animate-fade-in" style={{ color: '#1a7f37', background: 'rgba(63,185,80,0.1)', borderColor: 'rgba(63,185,80,0.3)' }}>
             {success}
           </div>
         )}
 
         <form onSubmit={handleSave} className="space-y-6">
           {/* Basic Info */}
-          <div className="border border-[var(--color-border-default)] rounded-xl p-5" style={{ background: 'var(--color-canvas-subtle)' }}>
-            <h3 className="text-sm font-semibold text-[var(--color-fg-default)] mb-4">基本信息</h3>
+          <div className="border border-[var(--color-border-default)] rounded-xl p-5 animate-fade-in" style={{ background: 'var(--color-canvas-subtle)' }}>
+            <h3 className="text-sm font-semibold text-[var(--color-fg-default)] mb-4 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full" style={{ background: '#6C3FF5' }} />
+              基本信息
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {!isEdit && (
                 <div>
@@ -163,8 +167,10 @@ export default function VersionEdit() {
                     value={packageId}
                     onChange={(e) => setPackageId(e.target.value)}
                     required
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
-                    style={{ background: 'var(--color-canvas-default)' }}
+                    className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none"
+                    style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
                   >
                     <option value="">选择软件包</option>
                     {packages.map((pkg) => (
@@ -183,8 +189,10 @@ export default function VersionEdit() {
                     onChange={(e) => setTagName(e.target.value)}
                     placeholder="如: v1.0.0"
                     required
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)] font-mono"
-                    style={{ background: 'var(--color-canvas-default)' }}
+                    className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none font-mono"
+                    style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
                   />
                 </div>
               )}
@@ -194,8 +202,10 @@ export default function VersionEdit() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="版本标题（可选）"
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
-                  style={{ background: 'var(--color-canvas-default)' }}
+                  className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none"
+                  style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
                 />
               </div>
             </div>
@@ -207,8 +217,10 @@ export default function VersionEdit() {
                 onChange={(e) => setBody(e.target.value)}
                 rows={12}
                 placeholder="## 新增功能&#10;&#10;- 功能 1&#10;- 功能 2&#10;&#10;## 修复&#10;&#10;- 问题修复"
-                className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)] font-mono resize-y"
-                style={{ background: 'var(--color-canvas-default)' }}
+                className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none font-mono resize-y"
+                style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
+                onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
               />
             </div>
 
@@ -219,6 +231,7 @@ export default function VersionEdit() {
                   checked={isDraft}
                   onChange={(e) => setIsDraft(e.target.checked)}
                   className="w-4 h-4 rounded"
+                  style={{ accentColor: '#6C3FF5' }}
                 />
                 <span className="text-sm text-[var(--color-fg-default)]">保存为草稿</span>
               </label>
@@ -228,6 +241,7 @@ export default function VersionEdit() {
                   checked={isPrerelease}
                   onChange={(e) => setIsPrerelease(e.target.checked)}
                   className="w-4 h-4 rounded"
+                  style={{ accentColor: '#6C3FF5' }}
                 />
                 <span className="text-sm text-[var(--color-fg-default)]">预发布版本</span>
               </label>
@@ -235,17 +249,23 @@ export default function VersionEdit() {
           </div>
 
           {/* Save button */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 animate-fade-in">
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white text-sm font-medium transition-colors disabled:opacity-60"
+              className="px-6 py-2 rounded-lg text-white text-sm font-medium transition-all disabled:opacity-60"
+              style={{ background: '#6C3FF5' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
             >
               {saving ? '保存中...' : isEdit ? '保存修改' : '创建版本'}
             </button>
             <Link
               to="/admin"
-              className="px-6 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)] transition-all no-underline"
+              className="px-6 py-2 rounded-lg border text-sm text-[var(--color-fg-muted)] transition-all no-underline"
+              style={{ borderColor: 'var(--color-border-default)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6C3FF5'; e.currentTarget.style.color = '#6C3FF5'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; e.currentTarget.style.color = 'var(--color-fg-muted)'; }}
             >
               取消
             </Link>
@@ -254,9 +274,12 @@ export default function VersionEdit() {
 
         {/* Assets (only in edit mode) */}
         {isEdit && (
-          <div className="mt-8 border border-[var(--color-border-default)] rounded-xl p-5" style={{ background: 'var(--color-canvas-subtle)' }}>
+          <div className="mt-8 border border-[var(--color-border-default)] rounded-xl p-5 animate-fade-in" style={{ background: 'var(--color-canvas-subtle)' }}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">附件文件 ({assets.length})</h3>
+              <h3 className="text-sm font-semibold text-[var(--color-fg-default)] flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full" style={{ background: '#6C3FF5' }} />
+                附件文件 ({assets.length})
+              </h3>
               <div>
                 <input
                   ref={fileInputRef}
@@ -268,8 +291,12 @@ export default function VersionEdit() {
                 />
                 <label
                   htmlFor="file-upload"
-                  className="text-xs px-4 py-2 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white transition-colors cursor-pointer"
+                  className="text-xs px-4 py-2 rounded-lg text-white transition-all cursor-pointer inline-flex items-center gap-2"
+                  style={{ background: '#6C3FF5' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
                 >
+                  <Upload className="w-3 h-3" />
                   {uploading ? '上传中...' : '+ 上传文件'}
                 </label>
               </div>
@@ -280,7 +307,7 @@ export default function VersionEdit() {
             ) : (
               <div className="divide-y divide-[var(--color-border-muted)]">
                 {assets.map((asset) => (
-                  <div key={asset.id} className="flex items-center gap-3 py-3">
+                  <div key={asset.id} className="flex items-center gap-3 py-3 hover:bg-[var(--color-canvas-default)] transition-colors rounded-lg px-2 -mx-2">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-fg-muted)" strokeWidth="2" className="shrink-0">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                       <polyline points="14 2 14 8 20 8"/>
@@ -291,7 +318,10 @@ export default function VersionEdit() {
                     </div>
                     <button
                       onClick={() => handleDeleteAsset(asset.id)}
-                      className="text-xs px-3 py-1 rounded-md border border-[var(--color-border-default)] text-[var(--color-danger-fg)] hover:border-[var(--color-danger-fg)] transition-all shrink-0"
+                      className="text-xs px-3 py-1 rounded-md border text-[var(--color-danger-fg)] transition-all shrink-0"
+                      style={{ borderColor: 'var(--color-border-default)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-danger-fg)'}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
                     >
                       删除
                     </button>

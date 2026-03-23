@@ -165,10 +165,10 @@ export default function AdminDashboard() {
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             {[
-              { label: '版本总数', value: stats.totalReleases, color: 'var(--color-accent-fg)' },
-              { label: '软件包', value: stats.totalPackages, color: 'var(--color-success-fg)' },
-              { label: '下载次数', value: Number(stats.totalDownloads).toLocaleString(), color: 'var(--color-accent-fg)' },
-              { label: '草稿版本', value: stats.draftReleases, color: 'var(--color-fg-muted)' },
+              { label: '版本总数', value: stats.totalReleases, color: '#6C3FF5' },
+              { label: '软件包', value: stats.totalPackages, color: '#1a7f37' },
+              { label: '下载次数', value: Number(stats.totalDownloads).toLocaleString(), color: '#6C3FF5' },
+              { label: '草稿版本', value: stats.draftReleases, color: '#57606a' },
             ].map((stat) => (
               <div key={stat.label} className="border border-[var(--color-border-default)] rounded-xl p-4" style={{ background: 'var(--color-canvas-subtle)' }}>
                 <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
@@ -200,7 +200,10 @@ export default function AdminDashboard() {
               <button
                 onClick={handleOneClickRelease}
                 disabled={buildLoading || Object.keys(jenkinsConfigs).length === 0}
-                className="text-xs px-4 py-2 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white transition-colors no-underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="text-xs px-4 py-2 rounded-lg text-white transition-all no-underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 animate-fade-in"
+                style={{ background: '#6C3FF5' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
               >
                 {buildLoading ? (
                   <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />构建中...</>
@@ -210,7 +213,10 @@ export default function AdminDashboard() {
               </button>
               <Link
                 to="/admin/releases/new"
-                className="text-xs px-4 py-2 rounded-lg border border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all no-underline"
+                className="text-xs px-4 py-2 rounded-lg border text-[var(--color-fg-muted)] transition-all no-underline animate-fade-in"
+                style={{ borderColor: 'var(--color-border-default)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6C3FF5'; e.currentTarget.style.color = '#6C3FF5'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; e.currentTarget.style.color = 'var(--color-fg-muted)'; }}
               >
                 + 新建版本
               </Link>
@@ -256,7 +262,7 @@ export default function AdminDashboard() {
                   <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">一键发版</h3>
                   {buildSession && (
                     <p className="text-xs text-[var(--color-fg-muted)] mt-0.5">
-                      版本号: <span className="font-mono text-[var(--color-accent-fg)]">{buildSession.tag_name}</span>
+                      版本号: <span className="font-mono" style={{ color: '#6C3FF5' }}>{buildSession.tag_name}</span>
                       · {buildSession.packages.length} 个软件包
                     </p>
                   )}
@@ -305,14 +311,17 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                         {/* Progress bar */}
-                        <div className="w-full h-1.5 rounded-full bg-[var(--color-canvas-default)] mb-1 overflow-hidden">
+                        <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-canvas-default)' }}>
                           <div
                             className={`h-full rounded-full transition-all ${
-                              pkg.status === 'failed' ? 'bg-[var(--color-danger-fg)]' :
-                              pkg.status === 'completed' ? 'bg-[var(--color-success-fg)]' :
-                              'bg-[var(--color-accent-emphasis)]'
+                              pkg.status === 'failed' ? '' :
+                              pkg.status === 'completed' ? '' :
+                              ''
                             }`}
-                            style={{ width: `${pkg.progress}%` }}
+                            style={{
+                              width: `${pkg.progress}%`,
+                              background: pkg.status === 'failed' ? 'var(--color-danger-fg)' : pkg.status === 'completed' ? 'var(--color-success-fg)' : '#6C3FF5'
+                            }}
                           />
                         </div>
                         {pkg.error && (
@@ -402,7 +411,7 @@ function ReleasesTable({ releases, onDelete, deleting }: {
         {releases.map((release) => (
           <tr key={release.id} className="hover:bg-[var(--color-canvas-default)] transition-colors">
             <td className="px-4 py-3">
-              <div className="font-mono font-medium text-[var(--color-accent-fg)]">{release.tag_name}</div>
+              <div className="font-mono font-medium" style={{ color: '#6C3FF5' }}>{release.tag_name}</div>
               {release.title && <div className="text-xs text-[var(--color-fg-muted)] mt-0.5 truncate max-w-[200px]">{release.title}</div>}
             </td>
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{release.package_name}</td>
@@ -424,7 +433,7 @@ function ReleasesTable({ releases, onDelete, deleting }: {
               <div className="flex items-center justify-end gap-2">
                 <Link
                   to={`/admin/releases/${release.id}/edit`}
-                  className="text-xs px-3 py-1 rounded-md border border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[var(--color-accent-fg)] hover:text-[var(--color-accent-fg)] transition-all no-underline"
+                  className="text-xs px-3 py-1 rounded-md border text-[var(--color-fg-muted)] hover:text-[#6C3FF5] hover:border-[#6C3FF5] transition-all no-underline"
                 >
                   编辑
                 </Link>
@@ -472,7 +481,7 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
       <tbody className="divide-y divide-[var(--color-border-muted)]">
         {packages.map((pkg) => (
           <tr key={pkg.id} className="hover:bg-[var(--color-canvas-default)] transition-colors">
-            <td className="px-4 py-3 font-mono font-medium text-[var(--color-accent-fg)]">{pkg.name}</td>
+            <td className="px-4 py-3 font-mono font-medium" style={{ color: '#6C3FF5' }}>{pkg.name}</td>
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{pkg.description || '-'}</td>
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatDate(pkg.created_at)}</td>
             <td className="px-4 py-3 text-right">
@@ -533,7 +542,10 @@ function PackageModal({ onAdded }: { onAdded: (pkg: Package) => void }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-xs px-4 py-2 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white transition-colors"
+        className="text-xs px-4 py-2 rounded-lg text-white transition-all animate-fade-in"
+                style={{ background: '#6C3FF5' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
       >
         + 新建软件包
       </button>
@@ -550,15 +562,15 @@ function PackageModal({ onAdded }: { onAdded: (pkg: Package) => void }) {
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
                 <label className="block text-sm text-[var(--color-fg-default)] mb-1">名称 *</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} required className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]" style={{ background: 'var(--color-canvas-default)' }} />
+                <input value={name} onChange={(e) => setName(e.target.value)} required className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]" style={{ background: 'var(--color-canvas-default)' }} />
               </div>
               <div>
                 <label className="block text-sm text-[var(--color-fg-default)] mb-1">描述</label>
-                <input value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]" style={{ background: 'var(--color-canvas-default)' }} />
+                <input value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]" style={{ background: 'var(--color-canvas-default)' }} />
               </div>
               <div>
                 <label className="block text-sm text-[var(--color-fg-default)] mb-1">主页</label>
-                <input value={homepage} onChange={(e) => setHomepage(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]" style={{ background: 'var(--color-canvas-default)' }} />
+                <input value={homepage} onChange={(e) => setHomepage(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]" style={{ background: 'var(--color-canvas-default)' }} />
               </div>
               {error && <p className="text-xs text-[var(--color-danger-fg)]">{error}</p>}
               <div className="flex gap-3 pt-2">
@@ -607,7 +619,7 @@ function UsersTable({ users, onDelete, deleting, onAdded }: {
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full border ${
                     user.role === 'admin'
-                      ? 'border-[var(--color-accent-fg)] text-[var(--color-accent-fg)]'
+                      ? 'border-[#6C3FF5] text-[#6C3FF5]'
                       : 'border-[var(--color-fg-muted)] text-[var(--color-fg-muted)]'
                   }`}>
                     {user.role === 'admin' ? '管理员' : '普通用户'}
@@ -664,7 +676,10 @@ function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-xs px-4 py-2 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white transition-colors"
+        className="text-xs px-4 py-2 rounded-lg text-white transition-all animate-fade-in"
+                style={{ background: '#6C3FF5' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
       >
         + 新建用户
       </button>
@@ -685,8 +700,10 @@ function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
-                  style={{ background: 'var(--color-canvas-default)' }}
+                  className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none"
+                  style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
                   placeholder="输入用户名"
                 />
               </div>
@@ -698,8 +715,10 @@ function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
-                  style={{ background: 'var(--color-canvas-default)' }}
+                  className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none"
+                  style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
                   placeholder="输入密码（至少6位）"
                 />
               </div>
@@ -708,8 +727,10 @@ function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
-                  style={{ background: 'var(--color-canvas-default)' }}
+                  className="w-full px-3 py-2 rounded-lg border text-sm text-[var(--color-fg-default)] focus:outline-none"
+                  style={{ background: 'var(--color-canvas-default)', borderColor: 'var(--color-border-default)' }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#6C3FF5'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--color-border-default)'}
                 >
                   <option value="user">普通用户</option>
                   <option value="admin">管理员</option>
@@ -799,7 +820,7 @@ function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }
               onChange={(e) => setJenkinsUrl(e.target.value)}
               required
               placeholder="https://jenkins.example.com"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
               style={{ background: 'var(--color-canvas-default)' }}
             />
           </div>
@@ -810,7 +831,7 @@ function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }
               onChange={(e) => setJobName(e.target.value)}
               required
               placeholder="my-app-build"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
               style={{ background: 'var(--color-canvas-default)' }}
             />
           </div>
@@ -821,7 +842,7 @@ function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }
               onChange={(e) => setUsername(e.target.value)}
               required
               placeholder="Jenkins 用户名"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
               style={{ background: 'var(--color-canvas-default)' }}
             />
           </div>
@@ -833,7 +854,7 @@ function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }
               onChange={(e) => setApiToken(e.target.value)}
               required
               placeholder="Jenkins 用户 API Token"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
               style={{ background: 'var(--color-canvas-default)' }}
             />
             <p className="text-xs text-[var(--color-fg-muted)] mt-1">
@@ -846,7 +867,7 @@ function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }
               value={artifactPattern}
               onChange={(e) => setArtifactPattern(e.target.value)}
               placeholder="*.zip"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[var(--color-accent-fg)]"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--color-border-default)] text-sm text-[var(--color-fg-default)] focus:outline-none focus:border-[#6C3FF5]"
               style={{ background: 'var(--color-canvas-default)' }}
             />
             <p className="text-xs text-[var(--color-fg-muted)] mt-1">

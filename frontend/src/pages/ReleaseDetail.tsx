@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getRelease, downloadAsset } from '../services/api';
 import type { Release } from '../types';
+import { ArrowLeft, Download, ExternalLink } from 'lucide-react';
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B';
@@ -70,121 +71,167 @@ export default function ReleaseDetail() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-[var(--color-accent-emphasis)] border-t-transparent rounded-full" />
+      <div className="max-w-4xl mx-auto px-4 py-16 flex items-center justify-center relative">
+        {/* Animated background */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute w-[500px] h-[500px] rounded-full animate-float-1" style={{ background: 'radial-gradient(circle at center, rgba(108,63,245,0.08) 0%, transparent 70%)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+        </div>
+        <div className="w-10 h-10 border-2 border-[#6C3FF5] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error || !release) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <div className="text-5xl mb-4">🔍</div>
-        <h1 className="text-xl font-bold mb-2">版本未找到</h1>
-        <p className="text-[var(--color-fg-muted)] mb-4">抱歉，找不到该版本的信息</p>
-        <Link to="/" className="text-sm text-[var(--color-accent-fg)] hover:underline">
-          ← 返回版本列表
-        </Link>
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center relative">
+        {/* Animated background */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute w-[400px] h-[400px] rounded-full animate-float-1" style={{ background: 'radial-gradient(circle at center, rgba(108,63,245,0.06) 0%, transparent 70%)', top: '30%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+        </div>
+        <div className="relative z-10">
+          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--color-canvas-subtle) 0%, rgba(108,63,245,0.1) 100%)' }}>
+            <span className="text-3xl">🔍</span>
+          </div>
+          <h1 className="text-xl font-bold mb-2">版本未找到</h1>
+          <p className="text-[var(--color-fg-muted)] mb-4">抱歉，找不到该版本的信息</p>
+          <Link to="/" className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-lg text-white transition-all" style={{ background: '#6C3FF5' }}>
+            <ArrowLeft className="w-4 h-4" />
+            返回版本列表
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Back */}
-      <Link to="/" className="inline-flex items-center gap-1 text-sm text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)] mb-6 no-underline">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>
-        返回
-      </Link>
+    <div className="max-w-4xl mx-auto px-4 py-8 relative">
+      {/* Animated background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        {/* Gradient orbs */}
+        <div className="absolute w-[500px] h-[500px] rounded-full animate-float-1" style={{ background: 'radial-gradient(circle at center, rgba(108,63,245,0.08) 0%, transparent 70%)', top: '-100px', right: '-100px' }} />
+        <div className="absolute w-[400px] h-[400px] rounded-full animate-float-2" style={{ background: 'radial-gradient(circle at center, rgba(139,92,246,0.06) 0%, transparent 70%)', bottom: '20%', left: '-100px' }} />
+        <div className="absolute w-[300px] h-[300px] rounded-full animate-float-3" style={{ background: 'radial-gradient(circle at center, rgba(167,139,250,0.05) 0%, transparent 70%)', bottom: '10%', right: '10%' }} />
 
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <h1 className="font-mono text-2xl font-bold text-[var(--color-fg-default)]">{release.tag_name}</h1>
-          {release.is_prerelease === 1 && (
-            <span className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-attention-fg)] text-[var(--color-attention-fg)]">
-              Pre-release
-            </span>
-          )}
-        </div>
-        {release.title && (
-          <h2 className="text-lg text-[var(--color-fg-muted)] font-normal mb-2">{release.title}</h2>
-        )}
-        <div className="flex items-center gap-3 text-sm text-[var(--color-fg-muted)]">
-          <span>{release.package_name}</span>
-          <span>·</span>
-          <span>{formatDate(release.created_at)}</span>
-          {release.homepage && (
-            <>
-              <span>·</span>
-              <a href={release.homepage} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                主页
-              </a>
-            </>
-          )}
-        </div>
+        {/* Grid pattern */}
+        <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: 'linear-gradient(#6C3FF5 1px, transparent 1px), linear-gradient(90deg, #6C3FF5 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
+        {/* Floating dots */}
+        <div className="absolute w-1.5 h-1.5 rounded-full animate-float-1" style={{ background: 'rgba(108,63,245,0.3)', top: '20%', left: '15%' }} />
+        <div className="absolute w-1 h-1 rounded-full animate-float-2" style={{ background: 'rgba(139,92,246,0.4)', top: '35%', left: '25%' }} />
+        <div className="absolute w-2 h-2 rounded-full animate-float-3" style={{ background: 'rgba(108,63,245,0.2)', bottom: '40%', right: '15%' }} />
+        <div className="absolute w-1 h-1 rounded-full animate-float-1" style={{ background: 'rgba(167,139,250,0.5)', bottom: '25%', right: '25%', animationDelay: '0.5s' }} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Changelog */}
-        <div className="lg:col-span-2">
-          <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden">
-            <div className="px-5 py-3 border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
-              <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">变更日志</h3>
-            </div>
-            <div className="p-5">
-              {release.body ? (
-                <div
-                  className="markdown-body"
-                  dangerouslySetInnerHTML={{ __html: parseMarkdown(release.body) }}
-                />
-              ) : (
-                <p className="text-[var(--color-fg-muted)] text-sm italic">暂无变更日志</p>
-              )}
-            </div>
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Top accent bar */}
+        <div className="h-1.5 rounded-full mb-6 animate-gradient" style={{ background: 'linear-gradient(90deg, #6C3FF5, #A78BFA, #C4B5FD, #6C3FF5)', backgroundSize: '200% auto' }} />
+
+        {/* Back */}
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-[var(--color-fg-muted)] hover:text-[#6C3FF5] mb-6 no-underline transition-colors animate-fade-in">
+          <ArrowLeft className="w-4 h-4" />
+          返回版本列表
+        </Link>
+
+        {/* Header */}
+        <div className="mb-6 animate-fade-in" style={{ borderLeft: '4px solid #6C3FF5', paddingLeft: '16px' }}>
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <h1 className="font-mono text-2xl font-bold text-[var(--color-fg-default)]">{release.tag_name}</h1>
+            {release.is_prerelease === 1 && (
+              <span className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-attention-fg)] text-[var(--color-attention-fg)]">
+                Pre-release
+              </span>
+            )}
+            {release.is_draft === 1 && (
+              <span className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-fg-muted)] text-[var(--color-fg-muted)]">
+                Draft
+              </span>
+            )}
+          </div>
+          {release.title && (
+            <h2 className="text-lg text-[var(--color-fg-muted)] font-normal mb-3">{release.title}</h2>
+          )}
+          <div className="flex items-center gap-3 text-sm text-[var(--color-fg-muted)]">
+            <span>{release.package_name}</span>
+            <span>·</span>
+            <span>{formatDate(release.created_at)}</span>
+            {release.homepage && (
+              <>
+                <span>·</span>
+                <a href={release.homepage} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-[#6C3FF5] transition-colors">
+                  项目主页 <ExternalLink className="w-3 h-3" />
+                </a>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Downloads */}
-        <div className="lg:col-span-1">
-          <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden sticky top-4">
-            <div className="px-5 py-3 border-b border-[var(--color-border-default)] bg-[var(--color-canvas-subtle)]">
-              <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">
-                Downloads ({release.assets?.length || 0})
-              </h3>
+        {/* Content grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Changelog */}
+          <div className="lg:col-span-2">
+            <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden animate-slide-in">
+              <div className="px-5 py-3 border-b border-[var(--color-border-default)]" style={{ background: 'var(--color-canvas-subtle)' }}>
+                <h3 className="text-sm font-semibold text-[var(--color-fg-default)] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: '#6C3FF5' }} />
+                  变更日志
+                </h3>
+              </div>
+              <div className="p-5">
+                {release.body ? (
+                  <div className="markdown-body" dangerouslySetInnerHTML={{ __html: parseMarkdown(release.body) }} />
+                ) : (
+                  <p className="text-[var(--color-fg-muted)] text-sm italic">暂无变更日志</p>
+                )}
+              </div>
             </div>
-            <div className="divide-y divide-[var(--color-border-muted)]">
-              {!release.assets || release.assets.length === 0 ? (
-                <div className="px-5 py-6 text-center text-sm text-[var(--color-fg-muted)]">
-                  暂无下载文件
-                </div>
-              ) : (
-                release.assets.map((asset) => (
-                  <div key={asset.id} className="px-4 py-3 flex items-center gap-3 hover:bg-[var(--color-canvas-subtle)] transition-colors">
-                    <span className="text-xl shrink-0">{getFileIcon(asset.name)}</span>
-                    <div className="flex-1 min-w-0">
+          </div>
+
+          {/* Downloads */}
+          <div className="lg:col-span-1">
+            <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden sticky top-4 animate-slide-in-right">
+              <div className="px-5 py-3 border-b border-[var(--color-border-default)]" style={{ background: 'var(--color-canvas-subtle)' }}>
+                <h3 className="text-sm font-semibold text-[var(--color-fg-default)] flex items-center gap-2">
+                  <Download className="w-4 h-4" style={{ color: '#6C3FF5' }} />
+                  Downloads ({release.assets?.length || 0})
+                </h3>
+              </div>
+              <div className="divide-y divide-[var(--color-border-muted)]">
+                {!release.assets || release.assets.length === 0 ? (
+                  <div className="px-5 py-6 text-center text-sm text-[var(--color-fg-muted)]">
+                    暂无下载文件
+                  </div>
+                ) : (
+                  release.assets.map((asset) => (
+                    <div key={asset.id} className="px-4 py-3 flex items-center gap-3 hover:bg-[var(--color-canvas-subtle)] transition-colors">
+                      <span className="text-xl shrink-0">{getFileIcon(asset.name)}</span>
+                      <div className="flex-1 min-w-0">
+                        <button
+                          onClick={() => handleDownload(asset.id)}
+                          className="text-sm text-[#6C3FF5] hover:underline text-left font-medium block w-full truncate transition-colors"
+                        >
+                          {asset.name}
+                        </button>
+                        <div className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">
+                          <span>{formatBytes(asset.size)}</span>
+                          <span>·</span>
+                          <span>{Number(asset.download_count).toLocaleString()} 次下载</span>
+                        </div>
+                      </div>
                       <button
                         onClick={() => handleDownload(asset.id)}
-                        className="text-sm text-[var(--color-accent-fg)] hover:underline text-left font-medium block w-full truncate"
+                        disabled={downloading === asset.id}
+                        className="shrink-0 text-xs px-3 py-1.5 rounded-lg text-white transition-all"
+                        style={{ background: downloading === asset.id ? '#A78BFA' : '#6C3FF5' }}
+                        onMouseEnter={(e) => { if (downloading !== asset.id) e.currentTarget.style.background = '#5B35E0'; }}
+                        onMouseLeave={(e) => { if (downloading !== asset.id) e.currentTarget.style.background = '#6C3FF5'; }}
                       >
-                        {asset.name}
+                        {downloading === asset.id ? '下载中' : '下载'}
                       </button>
-                      <div className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">
-                        <span>{formatBytes(asset.size)}</span>
-                        <span>·</span>
-                        <span>{Number(asset.download_count).toLocaleString()} 次下载</span>
-                      </div>
                     </div>
-                    <button
-                      onClick={() => handleDownload(asset.id)}
-                      disabled={downloading === asset.id}
-                      className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-[var(--color-accent-emphasis)] hover:bg-[var(--color-primary-700)] text-white transition-colors disabled:opacity-60"
-                    >
-                      {downloading === asset.id ? '下载中' : '下载'}
-                    </button>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
