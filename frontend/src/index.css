@@ -97,7 +97,7 @@ body::before {
   z-index: -1;
 }
 
-/* 粒子效果层 - 使用多个伪元素实现 */
+/* 粒子效果层 */
 .particles-layer {
   position: fixed;
   top: 0;
@@ -107,134 +107,6 @@ body::before {
   pointer-events: none;
   z-index: -1;
   overflow: hidden;
-}
-
-/* 大粒子 - 缓慢漂浮 - 柔和光晕 */
-.particle-large {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(108,63,245,0.5) 0%, rgba(108,63,245,0.15) 60%, transparent 100%);
-  animation: float-glow-1 20s ease-in-out infinite;
-}
-
-.particle-large:nth-child(1) { left: 5%; top: 10%; animation-delay: 0s; animation-duration: 18s; }
-.particle-large:nth-child(2) { left: 15%; top: 25%; animation-delay: -3s; animation-duration: 22s; }
-.particle-large:nth-child(3) { left: 25%; top: 8%; animation-delay: -5s; animation-duration: 19s; }
-.particle-large:nth-child(4) { left: 35%; top: 35%; animation-delay: -2s; animation-duration: 21s; }
-.particle-large:nth-child(5) { left: 45%; top: 15%; animation-delay: -7s; animation-duration: 20s; }
-.particle-large:nth-child(6) { left: 55%; top: 40%; animation-delay: -4s; animation-duration: 23s; }
-.particle-large:nth-child(7) { left: 65%; top: 12%; animation-delay: -6s; animation-duration: 17s; }
-.particle-large:nth-child(8) { left: 75%; top: 30%; animation-delay: -1s; animation-duration: 24s; }
-.particle-large:nth-child(9) { left: 85%; top: 18%; animation-delay: -8s; animation-duration: 19s; }
-.particle-large:nth-child(10) { left: 92%; top: 45%; animation-delay: -3s; animation-duration: 22s; }
-.particle-large:nth-child(11) { left: 12%; top: 55%; animation-delay: -4s; animation-duration: 20s; }
-.particle-large:nth-child(12) { left: 28%; top: 65%; animation-delay: -6s; animation-duration: 18s; }
-.particle-large:nth-child(13) { left: 48%; top: 58%; animation-delay: -2s; animation-duration: 21s; }
-.particle-large:nth-child(14) { left: 68%; top: 72%; animation-delay: -7s; animation-duration: 23s; }
-.particle-large:nth-child(15) { left: 82%; top: 62%; animation-delay: -5s; animation-duration: 19s; }
-.particle-large:nth-child(16) { left: 8%; top: 85%; animation-delay: -1s; animation-duration: 24s; }
-.particle-large:nth-child(17) { left: 38%; top: 88%; animation-delay: -3s; animation-duration: 20s; }
-.particle-large:nth-child(18) { left: 58%; top: 82%; animation-delay: -8s; animation-duration: 17s; }
-.particle-large:nth-child(19) { left: 78%; top: 92%; animation-delay: -4s; animation-duration: 22s; }
-.particle-large:nth-child(20) { left: 95%; top: 75%; animation-delay: -6s; animation-duration: 21s; }
-
-/* 中粒子 - 呼吸效果 - 柔和光点 */
-.particle-medium {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(139,92,246,0.5) 0%, rgba(139,92,246,0.1) 70%, transparent 100%);
-  animation: breathe-glow 4s ease-in-out infinite;
-}
-
-.particle-medium:nth-child(1) { left: 8%; top: 18%; animation-delay: 0s; }
-.particle-medium:nth-child(2) { left: 18%; top: 32%; animation-delay: 0.5s; }
-.particle-medium:nth-child(3) { left: 32%; top: 22%; animation-delay: 1s; }
-.particle-medium:nth-child(4) { left: 42%; top: 38%; animation-delay: 1.5s; }
-.particle-medium:nth-child(5) { left: 52%; top: 8%; animation-delay: 2s; }
-.particle-medium:nth-child(6) { left: 62%; top: 28%; animation-delay: 2.5s; }
-.particle-medium:nth-child(7) { left: 72%; top: 18%; animation-delay: 3s; }
-.particle-medium:nth-child(8) { left: 82%; top: 35%; animation-delay: 3.5s; }
-.particle-medium:nth-child(9) { left: 88%; top: 12%; animation-delay: 0.3s; }
-.particle-medium:nth-child(10) { left: 98%; top: 25%; animation-delay: 0.8s; }
-.particle-medium:nth-child(11) { left: 5%; top: 48%; animation-delay: 1.2s; }
-.particle-medium:nth-child(12) { left: 22%; top: 58%; animation-delay: 1.7s; }
-.particle-medium:nth-child(13) { left: 38%; top: 52%; animation-delay: 2.2s; }
-.particle-medium:nth-child(14) { left: 58%; top: 65%; animation-delay: 2.7s; }
-.particle-medium:nth-child(15) { left: 72%; top: 55%; animation-delay: 3.2s; }
-.particle-medium:nth-child(16) { left: 85%; top: 48%; animation-delay: 0.4s; }
-.particle-medium:nth-child(17) { left: 15%; top: 75%; animation-delay: 1.4s; }
-.particle-medium:nth-child(18) { left: 35%; top: 78%; animation-delay: 1.9s; }
-.particle-medium:nth-child(19) { left: 55%; top: 85%; animation-delay: 2.4s; }
-.particle-medium:nth-child(20) { left: 75%; top: 80%; animation-delay: 2.9s; }
-.particle-medium:nth-child(21) { left: 90%; top: 70%; animation-delay: 3.4s; }
-.particle-medium:nth-child(22) { left: 25%; top: 92%; animation-delay: 0.6s; }
-.particle-medium:nth-child(23) { left: 65%; top: 95%; animation-delay: 1.1s; }
-.particle-medium:nth-child(24) { left: 42%; top: 8%; animation-delay: 3.1s; }
-.particle-medium:nth-child(25) { left: 95%; top: 58%; animation-delay: 2.1s; }
-
-/* 小粒子 - 快速闪烁 - 微弱光点 */
-.particle-small {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: rgba(167,139,250,0.4);
-  animation: twinkle-glow 2s ease-in-out infinite;
-}
-
-.particle-small:nth-child(1) { left: 3%; top: 5%; animation-delay: 0s; }
-.particle-small:nth-child(2) { left: 12%; top: 42%; animation-delay: 0.2s; }
-.particle-small:nth-child(3) { left: 22%; top: 15%; animation-delay: 0.4s; }
-.particle-small:nth-child(4) { left: 28%; top: 48%; animation-delay: 0.6s; }
-.particle-small:nth-child(5) { left: 36%; top: 28%; animation-delay: 0.8s; }
-.particle-small:nth-child(6) { left: 44%; top: 5%; animation-delay: 1s; }
-.particle-small:nth-child(7) { left: 50%; top: 32%; animation-delay: 1.2s; }
-.particle-small:nth-child(8) { left: 56%; top: 18%; animation-delay: 1.4s; }
-.particle-small:nth-child(9) { left: 63%; top: 45%; animation-delay: 1.6s; }
-.particle-small:nth-child(10) { left: 70%; top: 8%; animation-delay: 1.8s; }
-.particle-small:nth-child(11) { left: 76%; top: 38%; animation-delay: 0.1s; }
-.particle-small:nth-child(12) { left: 82%; top: 22%; animation-delay: 0.3s; }
-.particle-small:nth-child(13) { left: 90%; top: 5%; animation-delay: 0.5s; }
-.particle-small:nth-child(14) { left: 96%; top: 32%; animation-delay: 0.7s; }
-.particle-small:nth-child(15) { left: 2%; top: 62%; animation-delay: 0.9s; }
-.particle-small:nth-child(16) { left: 10%; top: 78%; animation-delay: 1.1s; }
-.particle-small:nth-child(17) { left: 20%; top: 45%; animation-delay: 1.3s; }
-.particle-small:nth-child(18) { left: 30%; top: 72%; animation-delay: 1.5s; }
-.particle-small:nth-child(19) { left: 40%; top: 42%; animation-delay: 1.7s; }
-.particle-small:nth-child(20) { left: 46%; top: 68%; animation-delay: 1.9s; }
-.particle-small:nth-child(21) { left: 54%; top: 55%; animation-delay: 0.15s; }
-.particle-small:nth-child(22) { left: 60%; top: 75%; animation-delay: 0.35s; }
-.particle-small:nth-child(23) { left: 66%; top: 52%; animation-delay: 0.55s; }
-.particle-small:nth-child(24) { left: 74%; top: 68%; animation-delay: 0.75s; }
-.particle-small:nth-child(25) { left: 80%; top: 45%; animation-delay: 0.95s; }
-.particle-small:nth-child(26) { left: 86%; top: 82%; animation-delay: 1.15s; }
-.particle-small:nth-child(27) { left: 92%; top: 62%; animation-delay: 1.35s; }
-.particle-small:nth-child(28) { left: 98%; top: 88%; animation-delay: 1.55s; }
-.particle-small:nth-child(29) { left: 6%; top: 92%; animation-delay: 1.75s; }
-.particle-small:nth-child(30) { left: 34%; top: 98%; animation-delay: 1.95s; }
-
-/* 大粒子漂浮动画 - 柔和运动 */
-@keyframes float-glow-1 {
-  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
-  25% { transform: translate(30px, -20px); opacity: 0.6; }
-  50% { transform: translate(-15px, -40px); opacity: 0.5; }
-  75% { transform: translate(-35px, -15px); opacity: 0.7; }
-}
-
-/* 中粒子呼吸动画 */
-@keyframes breathe-glow {
-  0%, 100% { opacity: 0.3; transform: scale(0.9); }
-  50% { opacity: 0.7; transform: scale(1.1); }
-}
-
-/* 小粒子闪烁动画 */
-@keyframes twinkle-glow {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 0.5; }
 }
 
 a {
