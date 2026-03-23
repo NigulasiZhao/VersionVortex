@@ -11,6 +11,8 @@ import {
 } from '../services/api';
 import type { Package, Release, Asset } from '../types';
 import { ArrowLeft, Upload } from 'lucide-react';
+import { SimpleDialog } from '../components/ui/form-dialog';
+import { Button } from '../components/ui/button';
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B';
@@ -39,6 +41,8 @@ export default function VersionEdit() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingAssetId, setDeletingAssetId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -104,13 +108,21 @@ export default function VersionEdit() {
     }
   };
 
-  const handleDeleteAsset = async (assetId: number) => {
-    if (!confirm('确定要删除此文件？')) return;
+  const handleDeleteAsset = (assetId: number) => {
+    setDeletingAssetId(assetId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteAsset = async () => {
+    if (deletingAssetId === null) return;
     try {
-      await deleteAsset(assetId);
-      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+      await deleteAsset(deletingAssetId);
+      setAssets((prev) => prev.filter((a) => a.id !== deletingAssetId));
     } catch {
       setError('删除文件失败');
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingAssetId(null);
     }
   };
 
@@ -124,6 +136,29 @@ export default function VersionEdit() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-canvas-default)' }}>
+      {/* 删除确认对话框 */}
+      <SimpleDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="删除文件"
+        description="确定要删除此文件吗？此操作无法撤销。"
+      >
+        <div className="flex gap-3 justify-end">
+          <Button
+            variant="outline"
+            onClick={() => setDeleteDialogOpen(false)}
+          >
+            取消
+          </Button>
+          <Button
+            onClick={confirmDeleteAsset}
+            style={{ background: '#6C3FF5' }}
+          >
+            删除
+          </Button>
+        </div>
+      </SimpleDialog>
+
       {/* Header */}
       <header className="border-b border-[var(--color-border-default)]" style={{ background: 'var(--color-canvas-default)' }}>
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center gap-4">
