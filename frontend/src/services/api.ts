@@ -76,6 +76,7 @@ export const saveJenkinsConfig = (data: any) => api.post('/admin/jenkins-config'
 export const deleteJenkinsConfig = (packageId: number) => api.delete(`/admin/jenkins-config/${packageId}`).then((r) => r.data);
 export const triggerAllJenkinsBuilds = () => api.post('/admin/jenkins-build/trigger-all').then((r) => r.data);
 export const getJenkinsBuildSession = (sessionId: string) => api.get(`/admin/jenkins-build/session/${sessionId}`).then((r) => r.data);
+export const getJenkinsBuildActive = () => api.get('/admin/jenkins-build/active').then((r) => r.data);
 export const getJenkinsBuildHistory = () => api.get('/admin/jenkins-build/history').then((r) => r.data);
 
 export default api;

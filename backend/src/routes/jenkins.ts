@@ -37,6 +37,73 @@ interface BuildSession {
 
 const buildSessions = new Map<string, BuildSession>();
 
+// Database helpers for build sessions
+function saveBuildSessionToDb(session: BuildSession) {
+  const db = getDb();
+  // Upsert session
+  db.prepare(`
+    INSERT OR REPLACE INTO build_sessions (id, tag_name, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(session.id, session.tag_name, session.overall_status, session.created_at, new Date().toISOString());
+
+  // Delete old package records and insert new ones
+  db.prepare('DELETE FROM build_packages WHERE session_id = ?').run(session.id);
+
+  for (const pkg of session.packages) {
+    db.prepare(`
+      INSERT INTO build_packages (session_id, package_id, package_name, status, progress, build_number, error, artifact_names, artifact_sizes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      session.id,
+      pkg.package_id,
+      pkg.package_name,
+      pkg.status,
+      pkg.progress,
+      pkg.build_number,
+      pkg.error,
+      JSON.stringify(pkg.artifact_names),
+      JSON.stringify(pkg.artifact_sizes)
+    );
+  }
+}
+
+function getBuildSessionFromDb(sessionId: string): BuildSession | null {
+  const db = getDb();
+  const session = db.prepare('SELECT * FROM build_sessions WHERE id = ?').get(sessionId) as any;
+  if (!session) return null;
+
+  const packages = db.prepare('SELECT * FROM build_packages WHERE session_id = ?').all(sessionId) as any[];
+
+  return {
+    id: session.id,
+    tag_name: session.tag_name,
+    created_at: session.created_at,
+    overall_status: session.status,
+    release_id: null,
+    packages: packages.map(p => ({
+      package_id: p.package_id,
+      package_name: p.package_name,
+      job_name: '',
+      build_number: p.build_number,
+      status: p.status as any,
+      result: null,
+      artifact_name: p.artifact_names ? JSON.parse(p.artifact_names)[0] : null,
+      artifact_names: p.artifact_names ? JSON.parse(p.artifact_names) : [],
+      artifact_sizes: p.artifact_sizes ? JSON.parse(p.artifact_sizes) : [],
+      artifact_size: p.artifact_sizes ? JSON.parse(p.artifact_sizes)[0] : null,
+      error: p.error,
+      progress: p.progress,
+    })),
+  };
+}
+
+function getActiveBuildSessionFromDb(): BuildSession | null {
+  const db = getDb();
+  const session = db.prepare("SELECT * FROM build_sessions WHERE status = 'running' ORDER BY created_at DESC LIMIT 1").get() as any;
+  if (!session) return null;
+  return getBuildSessionFromDb(session.id);
+}
+
 // Helper: increment version number
 function incrementVersion(latestTag: string | null): string {
   if (!latestTag) return '1.0.0';
@@ -286,6 +353,9 @@ router.post('/jenkins-build/trigger-all', authenticateToken, requireAdmin, async
     };
     buildSessions.set(sessionId, session);
 
+    // Save to database for persistence
+    saveBuildSessionToDb(session);
+
     // Fire off builds for all packages in parallel (async, don't await)
     triggerPackageBuilds(sessionId, configs, tagName);
 
@@ -307,6 +377,9 @@ async function triggerPackageBuilds(sessionId: string, configs: any[], tagName: 
   const anyFailed = session.packages.some((p) => p.status === 'failed');
   const allDone = session.packages.every((p) => p.status === 'completed');
   session.overall_status = anyFailed ? 'failed' : 'completed';
+
+  // Save final status to database
+  saveBuildSessionToDb(session);
 }
 
 // Build a single package (runs in background)
@@ -520,17 +593,33 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
 
 // GET /api/admin/jenkins-build/session/:sessionId
 router.get('/jenkins-build/session/:sessionId', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
-  const session = buildSessions.get(req.params.sessionId);
+  // Try memory first, then database
+  let session: BuildSession | undefined = buildSessions.get(req.params.sessionId);
+  if (!session) {
+    session = getBuildSessionFromDb(req.params.sessionId) ?? undefined;
+  }
   if (!session) return res.status(404).json({ error: '构建会话不存在或已过期' });
+  res.json(session);
+});
+
+// GET /api/admin/jenkins-build/active - Get active running session
+router.get('/jenkins-build/active', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
+  // Try memory first, then database
+  let session: BuildSession | undefined = Array.from(buildSessions.values()).find(s => s.overall_status === 'running');
+  if (!session) {
+    session = getActiveBuildSessionFromDb() ?? undefined;
+  }
+  if (!session) return res.status(404).json({ error: '没有正在进行的构建任务' });
   res.json(session);
 });
 
 // GET /api/admin/jenkins-build/history
 router.get('/jenkins-build/history', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
-  const sessions = Array.from(buildSessions.values())
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 20);
-  res.json(sessions);
+  // Get from database
+  const db = getDb();
+  const sessions = db.prepare("SELECT * FROM build_sessions ORDER BY created_at DESC LIMIT 20").all() as any[];
+  const result = sessions.map(s => getBuildSessionFromDb(s.id)).filter(Boolean);
+  res.json(result);
 });
 router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {

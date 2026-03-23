@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   getAdminReleases,
   getAdminPackages,
@@ -15,10 +16,12 @@ import {
   deleteJenkinsConfig,
   triggerAllJenkinsBuilds,
   getJenkinsBuildSession,
+  getJenkinsBuildActive,
   getAdminReleases as reloadReleases,
   getAdminStats as reloadStats,
 } from '../services/api';
 import type { Release, Package, AdminStats, User, JenkinsConfig, BuildSession } from '../types';
+import { ChevronDown, ChevronUp, Rocket, Loader2, CheckCircle2, XCircle, Clock, Download, AlertCircle } from 'lucide-react';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('zh-CN', {
@@ -26,6 +29,228 @@ function formatDate(dateStr: string) {
     month: 'short',
     day: 'numeric',
   });
+}
+
+// 可折叠的构建进度面板组件
+function BuildProgressPanel({
+  buildSession,
+  buildLoading,
+  buildError,
+  isCollapsed,
+  onToggleCollapse,
+  onClose,
+  onMinimize
+}: {
+  buildSession: BuildSession | null;
+  buildLoading: boolean;
+  buildError: string;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  onClose: () => void;
+  onMinimize: () => void;
+}) {
+  const completedCount = buildSession?.packages.filter(p => p.status === 'completed').length || 0;
+  const totalCount = buildSession?.packages.length || 0;
+  const failedCount = buildSession?.packages.filter(p => p.status === 'failed').length || 0;
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+      case 'failed': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'building': return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+      case 'downloading': return <Download className="w-4 h-4 text-blue-500 animate-pulse" />;
+      case 'triggering': return <Rocket className="w-4 h-4 text-orange-500 animate-pulse" />;
+      default: return <Clock className="w-4 h-4 text-gray-400" />;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return '等待中';
+      case 'triggering': return '触发中';
+      case 'building': return '构建中';
+      case 'downloading': return '下载产物';
+      case 'completed': return '完成';
+      case 'failed': return '失败';
+      default: return '未知';
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {(buildSession || buildLoading || buildError) && (
+        <motion.div
+          initial={{ opacity: 0, x: 100, scale: 0.8 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: 100, scale: 0.8 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          className="fixed bottom-4 right-4 z-50"
+        >
+          <motion.div
+            layout
+            className="border rounded-xl shadow-2xl"
+            style={{
+              background: 'var(--color-canvas-subtle)',
+              borderColor: 'var(--color-border-default)',
+              width: isCollapsed ? '280px' : '360px',
+              maxHeight: isCollapsed ? 'none' : '70vh',
+              overflow: isCollapsed ? 'visible' : 'hidden'
+            }}
+          >
+            {/* 头部 */}
+            <motion.div
+              layout
+              className="px-4 py-3 border-b flex items-center justify-between cursor-pointer"
+              style={{ borderColor: 'var(--color-border-default)', background: 'var(--color-canvas-default)' }}
+              onClick={onToggleCollapse}
+            >
+              <div className="flex items-center gap-2">
+                {buildLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#6C3FF5' }} />
+                ) : buildSession?.overall_status === 'completed' ? (
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                ) : buildSession?.overall_status === 'failed' ? (
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                ) : (
+                  <Rocket className="w-4 h-4" style={{ color: '#6C3FF5' }} />
+                )}
+                <span className="text-sm font-medium text-[var(--color-fg-default)]">
+                  {buildLoading ? '正在发版中' : buildSession?.overall_status === 'completed' ? '发版完成' : buildSession?.overall_status === 'failed' ? '发版异常' : '一键发版'}
+                </span>
+                {buildSession && !isCollapsed && (
+                  <span className="text-xs text-[var(--color-fg-muted)]">
+                    {completedCount}/{totalCount}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                {isCollapsed && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onClose(); }}
+                    className="p-1 rounded hover:bg-[var(--color-canvas-subtle)] mr-1"
+                  >
+                    <XCircle className="w-4 h-4 text-[var(--color-fg-muted)]" />
+                  </button>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); isCollapsed ? onToggleCollapse() : onMinimize(); }}
+                  className="p-1 rounded hover:bg-[var(--color-canvas-subtle)]"
+                >
+                  <motion.div
+                    animate={{ rotate: isCollapsed ? 0 : 180 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronUp className="w-4 h-4 text-[var(--color-fg-muted)]" />
+                  </motion.div>
+                </button>
+              </div>
+            </motion.div>
+
+            {/* 内容区域 */}
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="p-4 space-y-3 overflow-y-auto"
+                >
+                {buildError && (
+                  <div className="text-sm text-[var(--color-danger-fg)] bg-[rgba(248,81,73,0.1)] border border-[rgba(248,81,73,0.3)] rounded-lg px-4 py-3">
+                    {buildError}
+                  </div>
+                )}
+
+                {buildLoading && !buildSession && (
+                  <div className="flex items-center gap-3 py-4">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Loader2 className="w-6 h-6" style={{ color: '#6C3FF5' }} />
+                    </motion.div>
+                    <span className="text-sm text-[var(--color-fg-muted)]">正在启动发版任务...</span>
+                  </div>
+                )}
+
+                {buildSession && (
+                  <div className="space-y-2">
+                    {buildSession.packages.map((pkg, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="border border-[var(--color-border-default)] rounded-lg p-3"
+                        style={{ background: 'var(--color-canvas-default)' }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(pkg.status)}
+                            <span className="text-sm font-medium text-[var(--color-fg-default)]">{pkg.package_name}</span>
+                            {pkg.build_number && (
+                              <span className="text-xs text-[var(--color-fg-muted)] font-mono">#{pkg.build_number}</span>
+                            )}
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            pkg.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            pkg.status === 'failed' ? 'bg-red-100 text-red-700' :
+                            pkg.status === 'downloading' ? 'bg-blue-100 text-blue-700' :
+                            pkg.status === 'building' ? 'bg-blue-100 text-blue-700' :
+                            pkg.status === 'triggering' ? 'bg-orange-100 text-orange-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {getStatusText(pkg.status)}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-canvas-subtle)' }}>
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${pkg.progress}%` }}
+                            className="h-full rounded-full"
+                            style={{
+                              background: pkg.status === 'failed' ? 'var(--color-danger-fg)' : pkg.status === 'completed' ? 'var(--color-success-fg)' : '#6C3FF5'
+                            }}
+                          />
+                        </div>
+                        {pkg.error && (
+                          <p className="text-xs text-[var(--color-danger-fg)] mt-1">{pkg.error}</p>
+                        )}
+                      </motion.div>
+                    ))}
+
+                    {buildSession.overall_status !== 'running' && (
+                      <div className={`text-sm text-center py-2 rounded-lg ${
+                        buildSession.overall_status === 'completed'
+                          ? 'text-green-600 bg-green-50'
+                          : 'text-red-600 bg-red-50'
+                      }`}>
+                        {buildSession.overall_status === 'completed'
+                          ? `✅ 全部发版完成，共 ${buildSession.packages.length} 个包`
+                          : '⚠️ 发版结束，部分包可能失败'}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(!buildLoading || buildSession?.overall_status !== 'running') && (
+                  <button
+                    onClick={onClose}
+                    className="w-full py-2 text-sm border border-[var(--color-border-default)] rounded-lg text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all"
+                  >
+                    关闭
+                  </button>
+                )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 export default function AdminDashboard() {
@@ -42,6 +267,52 @@ export default function AdminDashboard() {
   const [buildSession, setBuildSession] = useState<BuildSession | null>(null);
   const [buildLoading, setBuildLoading] = useState(false);
   const [buildError, setBuildError] = useState('');
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
+  const pollIntervalRef = useRef<number | null>(null);
+  const pollBuildSessionRef = useRef<((sessionId: string) => void) | null>(null);
+  const isRestoredRef = useRef(false);
+
+  // 保存状态到 localStorage
+  useEffect(() => {
+    if (buildSession) {
+      localStorage.setItem('build-session', JSON.stringify(buildSession));
+    }
+  }, [buildSession]);
+
+  useEffect(() => {
+    localStorage.setItem('build-loading', String(buildLoading));
+    if (!buildLoading) {
+      localStorage.removeItem('build-loading');
+    }
+  }, [buildLoading]);
+
+  // 检查是否有未完成的构建会话 - 页面加载时从数据库恢复
+  useEffect(() => {
+    // Prevent double restoration in React StrictMode
+    if (isRestoredRef.current) return;
+    isRestoredRef.current = true;
+
+    // 从数据库获取活动会话
+    getJenkinsBuildActive()
+      .then((activeSession) => {
+        if (activeSession && activeSession.overall_status === 'running') {
+          setBuildSession(activeSession);
+          setBuildLoading(true);
+          setIsPanelCollapsed(false);
+
+          // 延迟启动轮询以确保组件已准备就绪
+          setTimeout(() => {
+            if (pollBuildSessionRef.current) {
+              pollBuildSessionRef.current(activeSession.id);
+            }
+          }, 100);
+        }
+      })
+      .catch(() => {
+        // 忽略错误，可能是没有活动会话
+      });
+  }, []);
+
   const [jenkinsConfigModal, setJenkinsConfigModal] = useState<{ open: boolean; pkg: Package | null }>({ open: false, pkg: null });
 
   const load = () => {
@@ -129,26 +400,66 @@ export default function AdminDashboard() {
   };
 
   const pollBuildSession = (sessionId: string) => {
-    const interval = setInterval(async () => {
+    // Store ref for restoration after page refresh
+    pollBuildSessionRef.current = pollBuildSession;
+
+    // Clear existing interval if any
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
+
+    pollIntervalRef.current = window.setInterval(async () => {
       try {
         const session = await getJenkinsBuildSession(sessionId);
         setBuildSession(session);
         if (session.overall_status !== 'running') {
-          clearInterval(interval);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
           setBuildLoading(false);
+          // Clear localStorage when done
+          localStorage.removeItem('build-session');
+          localStorage.removeItem('build-loading');
           // Refresh data when done
           if (session.overall_status === 'completed') {
             load();
           }
         }
-      } catch {
-        // Ignore polling errors
+      } catch (err: any) {
+        // Session not found or error - clear state
+        if (err.response?.status === 404 || err.response?.status === 500) {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          setBuildSession(null);
+          setBuildLoading(false);
+          setBuildError('');
+          localStorage.removeItem('build-session');
+          localStorage.removeItem('build-loading');
+        }
       }
     }, 3000);
 
     // Auto-stop after 10 minutes
-    setTimeout(() => { clearInterval(interval); setBuildLoading(false); }, 600000);
+    setTimeout(() => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      setBuildLoading(false);
+    }, 600000);
   };
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -199,14 +510,14 @@ export default function AdminDashboard() {
             <div className="flex gap-2">
               <button
                 onClick={handleOneClickRelease}
-                disabled={buildLoading || Object.keys(jenkinsConfigs).length === 0}
+                disabled={buildLoading || buildSession?.overall_status === 'running' || Object.keys(jenkinsConfigs).length === 0}
                 className="text-xs px-4 py-2 rounded-lg text-white transition-all no-underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 animate-fade-in"
-                style={{ background: '#6C3FF5' }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
+                style={{ background: buildSession?.overall_status === 'running' ? '#A78BFA' : '#6C3FF5' }}
+                onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = '#5B35E0'; }}
+                onMouseLeave={(e) => e.currentTarget.style.background = buildSession?.overall_status === 'running' ? '#A78BFA' : '#6C3FF5'}
               >
-                {buildLoading ? (
-                  <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />构建中...</>
+                {buildLoading || buildSession?.overall_status === 'running' ? (
+                  <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />{buildSession?.overall_status === 'running' ? '发版中' : '构建中...'}</>
                 ) : (
                   <>🚀 一键发版</>
                 )}
@@ -253,114 +564,21 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* 一键发版进度弹窗 */}
-        {(buildSession || buildError || buildLoading) && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
-            <div className="w-full max-w-lg border border-[var(--color-border-default)] rounded-xl" style={{ background: 'var(--color-canvas-subtle)' }}>
-              <div className="px-5 py-4 border-b border-[var(--color-border-default)] flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-[var(--color-fg-default)]">一键发版</h3>
-                  {buildSession && (
-                    <p className="text-xs text-[var(--color-fg-muted)] mt-0.5">
-                      版本号: <span className="font-mono" style={{ color: '#6C3FF5' }}>{buildSession.tag_name}</span>
-                      · {buildSession.packages.length} 个软件包
-                    </p>
-                  )}
-                </div>
-                {(!buildLoading || buildSession?.overall_status !== 'running') && (
-                  <button onClick={() => { setBuildSession(null); setBuildError(''); }} className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                  </button>
-                )}
-              </div>
-              <div className="p-5 space-y-3">
-                {buildError && (
-                  <div className="text-sm text-[var(--color-danger-fg)] bg-[rgba(248,81,73,0.1)] border border-[rgba(248,81,73,0.3)] rounded-lg px-4 py-3">
-                    {buildError}
-                  </div>
-                )}
-                {buildLoading && !buildSession && (
-                  <div className="flex items-center gap-3 py-4">
-                    <div className="animate-spin w-6 h-6 border-2 border-[var(--color-accent-emphasis)] border-t-transparent rounded-full" />
-                    <span className="text-sm text-[var(--color-fg-muted)]">正在启动发版任务...</span>
-                  </div>
-                )}
-                {buildSession && (
-                  <div className="space-y-2">
-                    {buildSession.packages.map((pkg, idx) => (
-                      <div key={idx} className="border border-[var(--color-border-default)] rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-[var(--color-fg-default)]">{pkg.package_name}</span>
-                            {pkg.build_number && (
-                              <span className="text-xs text-[var(--color-fg-muted)] font-mono">#${pkg.build_number}</span>
-                            )}
-                          </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            pkg.status === 'completed' ? 'bg-[rgba(63,185,80,0.15)] text-[var(--color-success-fg)]' :
-                            pkg.status === 'failed' ? 'bg-[rgba(248,81,73,0.15)] text-[var(--color-danger-fg)]' :
-                            pkg.status === 'downloading' ? 'bg-[rgba(59,130,246,0.15)] text-[#3b82f6]' :
-                            'bg-[rgba(110,118,129,0.15)] text-[var(--color-fg-muted)]'
-                          }`}>
-                            {pkg.status === 'pending' && '等待中'}
-                            {pkg.status === 'triggering' && '触发中'}
-                            {pkg.status === 'building' && '构建中'}
-                            {pkg.status === 'downloading' && '下载产物'}
-                            {pkg.status === 'completed' && '完成'}
-                            {pkg.status === 'failed' && '失败'}
-                          </span>
-                        </div>
-                        {/* Progress bar */}
-                        <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-canvas-default)' }}>
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              pkg.status === 'failed' ? '' :
-                              pkg.status === 'completed' ? '' :
-                              ''
-                            }`}
-                            style={{
-                              width: `${pkg.progress}%`,
-                              background: pkg.status === 'failed' ? 'var(--color-danger-fg)' : pkg.status === 'completed' ? 'var(--color-success-fg)' : '#6C3FF5'
-                            }}
-                          />
-                        </div>
-                        {pkg.error && (
-                          <p className="text-xs text-[var(--color-danger-fg)]">{pkg.error}</p>
-                        )}
-                        {pkg.artifact_names && pkg.artifact_names.length > 0 && pkg.status === 'completed' && (
-                          <div className="text-xs text-[var(--color-fg-muted)] space-y-0.5">
-                            {pkg.artifact_names.map((name, i) => (
-                              <p key={i}>📦 {name} {pkg.artifact_sizes?.[i] ? `(${(pkg.artifact_sizes[i] / 1024 / 1024).toFixed(1)} MB)` : ''}</p>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {buildSession.overall_status !== 'running' && (
-                      <div className={`text-sm text-center py-2 rounded-lg ${
-                        buildSession.overall_status === 'completed'
-                          ? 'text-[var(--color-success-fg)]'
-                          : 'text-[var(--color-danger-fg)]'
-                      }`}>
-                        {buildSession.overall_status === 'completed'
-                          ? `✅ 全部发版完成，共 ${buildSession.packages.length} 个包`
-                          : '⚠️ 发版结束，部分包可能失败'}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {(!buildLoading || buildSession?.overall_status !== 'running') && (
-                  <button
-                    onClick={() => { setBuildSession(null); setBuildError(''); }}
-                    className="w-full py-2 text-sm border border-[var(--color-border-default)] rounded-lg text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)] transition-all"
-                  >
-                    关闭
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* 一键发版进度面板 - 可折叠 */}
+        <BuildProgressPanel
+          buildSession={buildSession}
+          buildLoading={buildLoading}
+          buildError={buildError}
+          isCollapsed={isPanelCollapsed}
+          onToggleCollapse={() => setIsPanelCollapsed(!isPanelCollapsed)}
+          onClose={() => {
+            setBuildSession(null);
+            setBuildError('');
+            localStorage.removeItem('build-session');
+            localStorage.removeItem('build-error');
+          }}
+          onMinimize={() => setIsPanelCollapsed(true)}
+        />
 
         {/* Jenkins 配置弹窗 */}
         {jenkinsConfigModal.open && jenkinsConfigModal.pkg && (

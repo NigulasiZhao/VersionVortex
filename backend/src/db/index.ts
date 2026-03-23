@@ -150,6 +150,31 @@ export async function initDb() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS build_sessions (
+      id TEXT PRIMARY KEY,
+      tag_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS build_packages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      package_id INTEGER NOT NULL,
+      package_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      progress INTEGER DEFAULT 0,
+      build_number INTEGER,
+      error TEXT,
+      artifact_names TEXT,
+      artifact_sizes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (session_id) REFERENCES build_sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
+    );
   `);
 
   // Seed default admin

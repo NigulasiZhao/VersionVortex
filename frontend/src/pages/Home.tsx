@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { getReleases, getPackages, getStats } from "../services/api";
 import type { Release, Package } from "../types";
 import { Timeline } from "../components/ui/Timeline";
@@ -7,6 +7,7 @@ import { Sparkles, Package as PackageIcon, Tag, Download } from "lucide-react";
 
 export default function Home() {
   const { name: packageName } = useParams();
+  const location = useLocation();
   const [releases, setReleases] = useState<Release[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -14,36 +15,39 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [scrollRestored, setScrollRestored] = useState(false);
 
-  // Data loading - use cache from sessionStorage
-  useEffect(() => {
-    const cachedData = sessionStorage.getItem('home-cache');
-    if (cachedData) {
-      try {
-        const { releases: r, packages: p, stats: s } = JSON.parse(cachedData);
-        setReleases(r);
-        setPackages(p);
-        setStats(s);
-        setLoading(false);
-      } catch {
-        // Cache invalid, fetch from API
-        loadData();
-      }
-    } else {
-      loadData();
-    }
+  // Check if returning from detail page (use cache) or fresh load (fetch API)
+  const isReturningFromDetail = location.state?.fromDetail === true;
 
-    function loadData() {
-      Promise.all([getReleases(), getPackages(), getStats()])
-        .then(([r, p, s]) => {
+  // Data loading - only use cache when returning from detail page
+  useEffect(() => {
+    if (isReturningFromDetail) {
+      // Use cache when returning from detail page
+      const cachedData = sessionStorage.getItem('home-cache');
+      if (cachedData) {
+        try {
+          const { releases: r, packages: p, stats: s } = JSON.parse(cachedData);
           setReleases(r);
           setPackages(p);
           setStats(s);
-          // Cache data
-          sessionStorage.setItem('home-cache', JSON.stringify({ releases: r, packages: p, stats: s }));
-        })
-        .finally(() => setLoading(false));
+          setLoading(false);
+          return; // Use cache, don't fetch
+        } catch {
+          // Cache invalid, fall through to fetch
+        }
+      }
     }
-  }, []);
+
+    // Always fetch from API on fresh load or when cache invalid
+    Promise.all([getReleases(), getPackages(), getStats()])
+      .then(([r, p, s]) => {
+        setReleases(r);
+        setPackages(p);
+        setStats(s);
+        // Cache the data for detail page returns
+        sessionStorage.setItem('home-cache', JSON.stringify({ releases: r, packages: p, stats: s }));
+      })
+      .finally(() => setLoading(false));
+  }, [isReturningFromDetail]);
 
   // Restore scroll position when returning from detail page
   useLayoutEffect(() => {

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import ReleaseDetail from './pages/ReleaseDetail';
@@ -9,7 +9,7 @@ import VersionEdit from './pages/VersionEdit';
 import Login from './pages/Login';
 
 // Animation variants for page transitions
-const pageVariants = {
+const pageVariants: Variants = {
   initial: {
     opacity: 0,
     x: -20,
@@ -19,7 +19,7 @@ const pageVariants = {
     x: 0,
     transition: {
       duration: 0.25,
-      ease: 'easeOut',
+      ease: [0.25, 0.1, 0.25, 1],
     },
   },
   exit: {
@@ -27,13 +27,13 @@ const pageVariants = {
     x: 20,
     transition: {
       duration: 0.2,
-      ease: 'easeIn',
+      ease: [0.25, 0.1, 0.25, 1],
     },
   },
 };
 
 // Reverse animation for back navigation
-const pageVariantsReverse = {
+const pageVariantsReverse: Variants = {
   initial: {
     opacity: 0,
     x: 20,
@@ -43,7 +43,7 @@ const pageVariantsReverse = {
     x: 0,
     transition: {
       duration: 0.25,
-      ease: 'easeOut',
+      ease: [0.25, 0.1, 0.25, 1],
     },
   },
   exit: {
@@ -51,7 +51,7 @@ const pageVariantsReverse = {
     x: -20,
     transition: {
       duration: 0.2,
-      ease: 'easeIn',
+      ease: [0.25, 0.1, 0.25, 1],
     },
   },
 };
