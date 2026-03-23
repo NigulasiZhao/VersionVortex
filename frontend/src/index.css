@@ -112,11 +112,10 @@ body::before {
 /* 大粒子 - 缓慢漂浮 */
 .particle-large {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: rgba(108, 63, 245, 0.15);
-  filter: blur(3px);
+  background: rgba(108, 63, 245, 0.6);
   animation: float-random-1 20s ease-in-out infinite;
 }
 
@@ -144,11 +143,10 @@ body::before {
 /* 中粒子 - 呼吸效果 */
 .particle-medium {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: rgba(139, 92, 246, 0.2);
-  filter: blur(2px);
+  background: rgba(139, 92, 246, 0.7);
   animation: breathe-pulse 4s ease-in-out infinite;
 }
 
@@ -181,11 +179,10 @@ body::before {
 /* 小粒子 - 快速闪烁 */
 .particle-small {
   position: absolute;
-  width: 3px;
-  height: 3px;
+  width: 2px;
+  height: 2px;
   border-radius: 50%;
-  background: rgba(167, 139, 250, 0.25);
-  filter: blur(1px);
+  background: rgba(167, 139, 250, 0.9);
   animation: twinkle 2s ease-in-out infinite;
 }
 
