@@ -97,7 +97,7 @@ export default function ReleaseDetail() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 relative">
+    <div className="max-w-6xl mx-auto px-4 py-8 relative">
       {/* Content */}
       <div className="relative z-10">
         {/* Back */}

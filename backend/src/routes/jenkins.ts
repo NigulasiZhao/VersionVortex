@@ -543,15 +543,20 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
 
   pkg.artifact_names = matchedArtifacts.map((a: any) => path.basename(a.relativePath));
 
-  // Create release first
-  getDb().prepare(
-    'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(config.package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
-  // Query by unique constraint (package_id + tag_name) to get the release ID
-  const release = getDb().prepare(
-    'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
-  ).get(config.package_id, tagName) as any;
-  const releaseId = release?.id;
+  // Create release first (use first package's release as the canonical one, or create if doesn't exist)
+  // Check if a release with this tag_name already exists (from another package in the same batch)
+  let release = getDb().prepare(
+    'SELECT id FROM releases WHERE tag_name = ? ORDER by id asc LIMIT 1'
+  ).get(tagName) as any;
+  let releaseId = release?.id;
+
+  if (!releaseId) {
+    getDb().prepare(
+      'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(config.package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
+    release = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? ORDER by id asc LIMIT 1').get(tagName) as any;
+    releaseId = release?.id;
+  }
   console.log(`[Jenkins] release created: id=${releaseId} tag=${tagName} pkg=${config.package_id}`);
 
   // Download all matched artifacts sequentially

@@ -66,7 +66,7 @@ export function FormDialog({
   })
   const [error, setError] = React.useState("")
 
-  // Reset form when dialog opens
+  // Reset form when dialog opens (only depend on open state, not fields array reference)
   React.useEffect(() => {
     if (open) {
       const initial: Record<string, string> = {}
@@ -76,13 +76,14 @@ export function FormDialog({
       setValues(initial)
       setError("")
     }
-  }, [open, fields, defaultValues])
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     try {
       await onSubmit(values)
+      onOpenChange(false)
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || "操作失败")
     }
@@ -140,6 +141,7 @@ export function FormDialog({
                   placeholder={field.placeholder}
                   value={values[field.id]}
                   onChange={(e) => handleChange(field.id, e.target.value)}
+                  onPointerDown={(e) => e.stopPropagation()}
                   required={field.required}
                   className={cn(
                     "flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors",
