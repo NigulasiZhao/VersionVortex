@@ -1,143 +1,233 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, useMotionValue, useSpring } from 'framer-motion';
+"use client";
+import { useRef, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789{ }< >[ ]";
-
-function generateRandomString(length: number) {
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
+interface BeamOptions {
+  x: number;
+  duration: number;
+  delay: number;
+  height: number;
 }
 
-export function Particles() {
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
+interface CollisionMechanismProps {
+  beamOptions: BeamOptions;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  parentRef: React.RefObject<HTMLDivElement | null>;
+}
 
-  const [randomStrings, setRandomStrings] = useState<string[]>([]);
-
-  // Smooth spring animation for mouse following
-  const springConfig = { damping: 25, stiffness: 150 };
-  const smoothX = useSpring(mouseX, springConfig);
-  const smoothY = useSpring(mouseY, springConfig);
-
-  useEffect(() => {
-    // Generate random strings for the background
-    const strings = [];
-    for (let i = 0; i < 8; i++) {
-      strings.push(generateRandomString(800));
-    }
-    setRandomStrings(strings);
-  }, []);
+const CollisionMechanism = ({ beamOptions, containerRef, parentRef }: CollisionMechanismProps) => {
+  const beamRef = useRef<HTMLDivElement>(null);
+  const [collision, setCollision] = useState({
+    detected: false,
+    coordinates: null as { x: number; y: number } | null,
+  });
+  const [beamKey, setBeamKey] = useState(0);
+  const [cycleCollisionDetected, setCycleCollisionDetected] = useState(false);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      mouseX.set(e.clientX);
-      mouseY.set(e.clientY);
+    const checkCollision = () => {
+      if (
+        beamRef.current &&
+        containerRef.current &&
+        parentRef.current &&
+        !cycleCollisionDetected
+      ) {
+        const beamRect = beamRef.current.getBoundingClientRect();
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const parentRect = parentRef.current.getBoundingClientRect();
+
+        if (beamRect.bottom >= containerRect.top) {
+          const relativeX = beamRect.left - parentRect.left + beamRect.width / 2;
+          const relativeY = beamRect.bottom - parentRect.top;
+
+          setCollision({
+            detected: true,
+            coordinates: { x: relativeX, y: relativeY },
+          });
+          setCycleCollisionDetected(true);
+        }
+      }
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [mouseX, mouseY]);
+    const animationInterval = setInterval(checkCollision, 50);
+    return () => clearInterval(animationInterval);
+  }, [cycleCollisionDetected, containerRef, parentRef]);
 
-  // Create mask image for the effect
-  const maskImage = `radial-gradient(350px at ${smoothX.get()}px ${smoothY.get()}px, rgba(108,63,245,0.15), transparent)`;
+  useEffect(() => {
+    if (collision.detected && collision.coordinates) {
+      const timeout = setTimeout(() => {
+        setCollision({ detected: false, coordinates: null });
+        setCycleCollisionDetected(false);
+      }, 2000);
+
+      const keyTimeout = setTimeout(() => {
+        setBeamKey((prevKey) => prevKey + 1);
+      }, 2000);
+
+      return () => {
+        clearTimeout(timeout);
+        clearTimeout(keyTimeout);
+      };
+    }
+  }, [collision]);
 
   return (
-    <div className="particles-layer">
-      {/* Base gradient background */}
-      <div
-        className="absolute inset-0"
+    <>
+      <motion.div
+        key={beamKey}
+        ref={beamRef}
+        initial={{
+          translateY: "0px",
+          translateX: `${beamOptions.x}px`,
+        }}
+        animate={{
+          translateY: "calc(100vh + 100px)",
+          translateX: `${beamOptions.x}px`,
+        }}
+        transition={{
+          duration: beamOptions.duration,
+          repeat: Infinity,
+          repeatType: "loop",
+          ease: "linear",
+          delay: beamOptions.delay,
+        }}
         style={{
-          background: 'linear-gradient(135deg, rgba(108,63,245,0.03) 0%, rgba(139,92,246,0.02) 50%, rgba(167,139,250,0.03) 100%)',
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: 2,
+          height: beamOptions.height,
+          borderRadius: 9999,
+          background: `linear-gradient(to bottom, transparent 0%, transparent 60%, #6C3FF5 85%, #A78BFA 100%)`,
         }}
       />
-
-      {/* Matrix-like floating characters - revealed by mouse position */}
-      <motion.div
-        className="absolute inset-0 overflow-hidden pointer-events-none"
-        style={{
-          maskImage,
-          WebkitMaskImage: maskImage,
-        }}
-      >
-        {randomStrings.map((str, index) => (
-          <div
-            key={index}
-            className="absolute text-[10px] font-mono break-all leading-relaxed whitespace-nowrap"
+      <AnimatePresence>
+        {collision.detected && collision.coordinates && (
+          <Explosion
+            key={`${collision.coordinates.x}-${collision.coordinates.y}`}
             style={{
-              top: `${10 + index * 12}%`,
-              left: '-20%',
-              width: '140%',
-              color: 'rgba(108, 63, 245, 0.25)',
-              transform: `rotate(${index % 2 === 0 ? '-2deg' : '2deg'})`,
-              animation: `float-chars-${index % 4 + 1} ${25 + index * 3}s linear infinite`,
+              left: `${collision.coordinates.x}px`,
+              top: `${collision.coordinates.y}px`,
+              transform: "translate(-50%, -50%)",
             }}
-          >
-            {str}
-          </div>
-        ))}
-      </motion.div>
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
 
-      {/* Subtle gradient orbs for ambient effect */}
-      <div
-        className="absolute w-[600px] h-[600px] rounded-full opacity-40"
-        style={{
-          background: 'radial-gradient(circle, rgba(108,63,245,0.12) 0%, transparent 70%)',
-          top: '20%',
-          left: '10%',
-          animation: 'orb-float-1 20s ease-in-out infinite',
-        }}
-      />
-      <div
-        className="absolute w-[500px] h-[500px] rounded-full opacity-30"
-        style={{
-          background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)',
-          bottom: '15%',
-          right: '10%',
-          animation: 'orb-float-2 25s ease-in-out infinite',
-        }}
-      />
+const Explosion = ({ ...props }: React.HTMLProps<HTMLDivElement>) => {
+  const spans = Array.from({ length: 20 }, (_, index) => ({
+    id: index,
+    directionX: Math.floor(Math.random() * 80 - 40),
+    directionY: Math.floor(Math.random() * -60 - 10),
+  }));
 
-      {/* Mouse-following glow */}
+  return (
+    <div
+      {...props}
+      style={{
+        position: "absolute",
+        zIndex: 50,
+        ...props.style,
+      }}
+    >
       <motion.div
-        className="absolute w-[400px] h-[400px] rounded-full pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
         style={{
-          background: 'radial-gradient(circle, rgba(108,63,245,0.08) 0%, transparent 70%)',
-          x: smoothX,
-          y: smoothY,
-          translateX: '-50%',
-          translateY: '-50%',
+          position: "absolute",
+          left: -60,
+          right: -60,
+          top: 0,
+          height: 3,
+          borderRadius: 9999,
+          background: "linear-gradient(to right, transparent, #6C3FF5, #A78BFA, transparent)",
+          boxShadow: "0 0 8px 1px rgba(108, 63, 245, 0.6)",
         }}
       />
+      {spans.map((span) => (
+        <motion.span
+          key={span.id}
+          initial={{ x: 0, y: 0, opacity: 1 }}
+          animate={{
+            x: span.directionX,
+            y: span.directionY,
+            opacity: 0,
+          }}
+          transition={{ duration: Math.random() * 1.5 + 0.5, ease: "easeOut" }}
+          style={{
+            position: "absolute",
+            height: 3,
+            width: 3,
+            borderRadius: "50%",
+            background: "#A78BFA",
+            boxShadow: "0 0 4px 1px rgba(108, 63, 245, 0.6)",
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
-      <style>{`
-        @keyframes float-chars-1 {
-          0% { transform: translateX(0) rotate(-2deg); }
-          100% { transform: translateX(20%) rotate(-2deg); }
-        }
-        @keyframes float-chars-2 {
-          0% { transform: translateX(0) rotate(2deg); }
-          100% { transform: translateX(-15%) rotate(2deg); }
-        }
-        @keyframes float-chars-3 {
-          0% { transform: translateX(0) rotate(-1deg); }
-          100% { transform: translateX(25%) rotate(-1deg); }
-        }
-        @keyframes float-chars-4 {
-          0% { transform: translateX(0) rotate(1deg); }
-          100% { transform: translateX(-20%) rotate(1deg); }
-        }
-        @keyframes orb-float-1 {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(30px, -20px); }
-        }
-        @keyframes orb-float-2 {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(-20px, 30px); }
-        }
-      `}</style>
+export function Particles() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const beams: BeamOptions[] = [
+    { x: 60, duration: 5, delay: 0, height: 55 },
+    { x: Math.round(windowWidth * 0.15), duration: 6, delay: 0.5, height: 90 },
+    { x: Math.round(windowWidth * 0.3), duration: 4, delay: 1, height: 40 },
+    { x: Math.round(windowWidth * 0.45), duration: 7, delay: 0.3, height: 70 },
+    { x: Math.round(windowWidth * 0.6), duration: 5, delay: 0.8, height: 50 },
+    { x: Math.round(windowWidth * 0.75), duration: 6, delay: 1.2, height: 85 },
+    { x: Math.round(windowWidth * 0.9), duration: 4, delay: 0.2, height: 45 },
+    { x: Math.round(windowWidth * 0.97), duration: 7, delay: 0.7, height: 65 },
+  ];
+
+  return (
+    <div
+      ref={parentRef}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 0,
+        background: "linear-gradient(to bottom, #f8fafc 0%, #f1f5f9 60%, #ede9fe 100%)",
+        overflow: "hidden",
+        pointerEvents: "none",
+      }}
+    >
+      {beams.map((beam, idx) => (
+        <CollisionMechanism
+          key={`beam-${idx}`}
+          beamOptions={beam}
+          containerRef={containerRef}
+          parentRef={parentRef}
+        />
+      ))}
+
+      {/* 触底爆炸检测线 */}
+      <div
+        ref={containerRef}
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 1,
+          background: "transparent",
+        }}
+      />
     </div>
   );
 }

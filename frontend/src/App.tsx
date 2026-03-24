@@ -64,8 +64,12 @@ function AnimatedRoutes() {
   const isReturningFromDetail = location.pathname === '/' &&
     sessionStorage.getItem('home-scroll-position');
 
+  // 只在非管理后台页面显示动画
+  const showParticles = !location.pathname.startsWith('/admin');
+
   return (
     <AnimatePresence mode="wait">
+      {showParticles && <Particles />}
       <Routes location={location} key={location.pathname}>
         {/* Public routes - require authentication */}
         <Route element={<RequireAuth><Layout /></RequireAuth>}>
@@ -167,7 +171,6 @@ function AnimatedRoutes() {
 function App() {
   return (
     <BrowserRouter>
-      <Particles />
       <AnimatedRoutes />
     </BrowserRouter>
   );
