@@ -93,11 +93,12 @@ router.get('/assets/:id/download', (req: Request, res: Response) => {
 
     if (asset.file_path.startsWith('sample/')) {
       res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${asset.name}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(asset.name)}"; filename*=UTF-8''${encodeURIComponent(asset.name)}`);
       res.send(`Demo file: ${asset.name}\nThis is a sample file for demonstration purposes.`);
       return;
     }
 
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(asset.name)}"; filename*=UTF-8''${encodeURIComponent(asset.name)}`);
     res.download(asset.file_path, asset.name);
   } catch (err) {
     res.status(500).json({ error: '下载失败' });

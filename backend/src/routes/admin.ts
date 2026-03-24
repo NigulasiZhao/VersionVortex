@@ -9,6 +9,11 @@ import { authenticateToken, requireAdmin, AuthRequest, JWT_SECRET } from '../mid
 
 const router = Router();
 
+// Fix filename encoding (Latin-1 misinterpreted as UTF-8 -> correct UTF-8)
+function fixFilename(filename: string): string {
+  return Buffer.from(filename, 'latin1').toString('utf8');
+}
+
 // Multer config
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -138,14 +143,15 @@ router.post('/releases/:id/assets', authenticateToken, requireAdmin, upload.sing
       return res.status(404).json({ error: '版本不存在' });
     }
 
-    const result = getDb().prepare(`
+    const originalName = fixFilename(req.file!.originalname);
+    getDb().prepare(`
       INSERT INTO assets (release_id, name, size, file_path)
       VALUES (?, ?, ?, ?)
-    `).run(req.params.id, req.file!.originalname, req.file!.size, req.file!.path);
+    `).run(req.params.id, originalName, req.file!.size, req.file!.path);
 
-    const assetId = Number(result.lastInsertRowid);
-    const asset = getDb().prepare('SELECT * FROM assets WHERE id = ?').get(assetId);
-    res.status(201).json(asset);
+    const inserted = getDb().prepare('SELECT * FROM assets WHERE release_id = ? AND name = ? AND size = ?').get(req.params.id, originalName, req.file!.size) as any;
+    if (!inserted) return res.status(500).json({ error: '上传文件失败' });
+    res.status(201).json(inserted);
   } catch (err) {
     res.status(500).json({ error: '上传文件失败' });
   }
@@ -154,7 +160,10 @@ router.post('/releases/:id/assets', authenticateToken, requireAdmin, upload.sing
 // DELETE /api/admin/assets/:id - Delete asset
 router.delete('/assets/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
-    const asset = getDb().prepare('SELECT * FROM assets WHERE id = ?').get(req.params.id) as any;
+    const assetId = Number(req.params.id);
+    if (isNaN(assetId)) return res.status(400).json({ error: '无效的文件ID' });
+
+    const asset = getDb().prepare('SELECT * FROM assets WHERE id = ?').get(assetId) as any;
     if (!asset) return res.status(404).json({ error: '文件不存在' });
 
     if (!asset.file_path.startsWith('sample/')) {
@@ -164,7 +173,7 @@ router.delete('/assets/:id', authenticateToken, requireAdmin, (req: AuthRequest,
       }
     }
 
-    getDb().prepare('DELETE FROM assets WHERE id = ?').run(req.params.id);
+    getDb().prepare('DELETE FROM assets WHERE id = ?').run(assetId);
     res.json({ message: '删除成功' });
   } catch (err) {
     res.status(500).json({ error: '删除文件失败' });
