@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -106,7 +105,7 @@ function ReleaseCard({ release, isLatest }) {
       )}
 
       <div className="flex items-center gap-3 text-xs mb-3" style={{ color: "var(--color-fg-muted)" }}>
-        <span>{release.package_name}</span>
+        <span>{release.all_package_names || release.package_name}</span>
         <span>·</span>
         <span>{formatDate(release.created_at)}</span>
         {totalDownloads !== undefined && totalDownloads > 0 && (
@@ -143,13 +142,16 @@ function ReleaseCard({ release, isLatest }) {
   );
 }
 
-export function Timeline({ releases, packages, className = "" }) {
-  const [selectedPackage, setSelectedPackage] = useState("all");
-
+export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage }) {
   const filteredReleases =
     selectedPackage === "all"
       ? releases
-      : releases.filter((r) => r.package_name === selectedPackage);
+      : releases.filter((r) => {
+          // Check if this release includes the selected package
+          // Use all_package_names if available, otherwise fall back to package_name
+          const allNames = r.all_package_names || r.package_name;
+          return allNames && allNames.split(',').includes(selectedPackage);
+        });
 
   const monthGroups = groupByMonth(filteredReleases);
 

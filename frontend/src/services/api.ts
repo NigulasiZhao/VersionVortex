@@ -29,7 +29,7 @@ api.interceptors.response.use(
 );
 
 // Public APIs
-export const getReleases = () => api.get('/releases').then((r) => r.data);
+export const getReleases = (pkg?: string) => api.get('/releases', { params: pkg && pkg !== 'all' ? { package: pkg } : {} }).then((r) => r.data);
 export const getRelease = (tag: string) => api.get(`/releases/${tag}`).then((r) => r.data);
 export const getPackages = () => api.get('/packages').then((r) => r.data);
 export const getPackageReleases = (name: string) => api.get(`/packages/${name}/releases`).then((r) => r.data);

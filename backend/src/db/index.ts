@@ -131,6 +131,7 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS assets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       release_id INTEGER NOT NULL,
+      package_id INTEGER,
       name TEXT NOT NULL,
       size INTEGER NOT NULL,
       download_count INTEGER DEFAULT 0,
@@ -176,6 +177,13 @@ export async function initDb() {
       FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
     );
   `);
+
+  // Migration: add package_id column to assets if it doesn't exist (for existing databases)
+  try {
+    db.exec("ALTER TABLE assets ADD COLUMN package_id INTEGER");
+  } catch (e: any) {
+    // Column may already exist, ignore
+  }
 
   // Seed default admin
   const adminExists = dbWrapper.prepare('SELECT id FROM users WHERE username = ?').get('admin');

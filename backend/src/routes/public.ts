@@ -3,18 +3,30 @@ import { getDb } from '../db/index';
 
 const router = Router();
 
-// GET /api/releases - Get all published releases
-router.get('/releases', (_req: Request, res: Response) => {
+// GET /api/releases - Get all published releases (optional ?package=filter by package name)
+router.get('/releases', (req: Request, res: Response) => {
   try {
-    const releases = getDb().prepare(`
+    const packageFilter = req.query.package as string | undefined;
+    let query = `
       SELECT r.*, p.name as package_name, p.description as package_description,
         (SELECT COUNT(*) FROM assets WHERE release_id = r.id) as asset_count,
-        (SELECT SUM(download_count) FROM assets WHERE release_id = r.id) as total_downloads
+        (SELECT SUM(download_count) FROM assets WHERE release_id = r.id) as total_downloads,
+        (SELECT GROUP_CONCAT(DISTINCT pk.name) FROM assets a JOIN packages pk ON a.package_id = pk.id WHERE a.release_id = r.id) as all_package_names
       FROM releases r
       JOIN packages p ON r.package_id = p.id
       WHERE r.is_draft = 0
-      ORDER BY r.created_at DESC
-    `).all();
+    `;
+    const params: any[] = [];
+
+    if (packageFilter && packageFilter !== 'all') {
+      // Filter by package: either the release belongs to this package, or has assets from this package
+      query += ` AND (p.name = ? OR EXISTS (SELECT 1 FROM assets a JOIN packages pk ON a.package_id = pk.id WHERE a.release_id = r.id AND pk.name = ?))`;
+      params.push(packageFilter, packageFilter);
+    }
+
+    query += ` ORDER BY r.created_at DESC`;
+
+    const releases = getDb().prepare(query).all(...params);
     res.json(releases);
   } catch (err) {
     res.status(500).json({ error: '获取版本列表失败' });

@@ -32,6 +32,7 @@ export interface Release {
   asset_count?: number;
   total_downloads?: number;
   assets?: Asset[];
+  all_package_names?: string; // comma-separated list of all packages that contributed assets to this release
 }
 
 export interface Asset {

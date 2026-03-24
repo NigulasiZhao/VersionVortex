@@ -576,8 +576,8 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
       await downloadFile(artifactUrl, localPath, credentials);
       const fileSize = fs.statSync(localPath).size;
       getDb().prepare(
-        'INSERT INTO assets (release_id, name, size, file_path) VALUES (?, ?, ?, ?)'
-      ).run(releaseId, fileName, fileSize, localPath);
+        'INSERT INTO assets (release_id, package_id, name, size, file_path) VALUES (?, ?, ?, ?, ?)'
+      ).run(releaseId, config.package_id, fileName, fileSize, localPath);
       downloadedNames.push(fileName);
       downloadedSizes.push(fileSize);
     } catch (err: any) {
@@ -803,8 +803,8 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
         await downloadFile(artifactUrl, localPath, credentials);
         const fileSize = fs.statSync(localPath).size;
         getDb().prepare(
-          'INSERT INTO assets (release_id, name, size, file_path) VALUES (?, ?, ?, ?)'
-        ).run(releaseId, fileName, fileSize, localPath);
+          'INSERT INTO assets (release_id, package_id, name, size, file_path) VALUES (?, ?, ?, ?, ?)'
+        ).run(releaseId, package_id, fileName, fileSize, localPath);
         downloaded.push({ name: fileName, size: fileSize });
       } catch (err: any) {
         downloadFailed = true;

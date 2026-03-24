@@ -49,6 +49,13 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, [isReturningFromDetail]);
 
+  // Refetch releases when package filter changes (don't show loading, just update when data arrives)
+  useEffect(() => {
+    if (!loading && selectedPackage !== undefined) {
+      getReleases(selectedPackage).then((r) => setReleases(r));
+    }
+  }, [selectedPackage]);
+
   // Restore scroll position when returning from detail page
   useLayoutEffect(() => {
     if (loading) return;
@@ -60,11 +67,6 @@ export default function Home() {
       setScrollRestored(true);
     }
   }, [loading]);
-
-  const filtered =
-    selectedPackage === "all"
-      ? releases
-      : releases.filter((r) => r.package_name === selectedPackage);
 
   // Smooth fade-in when data loads
   const [visible, setVisible] = useState(false);
@@ -153,7 +155,7 @@ export default function Home() {
         </div>
 
         {/* Timeline */}
-        {filtered.length === 0 ? (
+        {releases.length === 0 ? (
           <div className="text-center py-16 animate-fade-in">
             <div
               className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
@@ -164,7 +166,7 @@ export default function Home() {
             <p style={{ color: "var(--color-fg-muted)" }}>暂无版本</p>
           </div>
         ) : (
-          <Timeline releases={filtered} packages={packages} />
+          <Timeline releases={releases} packages={packages} selectedPackage={selectedPackage} setSelectedPackage={setSelectedPackage} />
         )}
       </div>
     </div>

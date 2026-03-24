@@ -197,9 +197,9 @@ router.post('/packages', authenticateToken, requireAdmin, (req: AuthRequest, res
     if (!name) return res.status(400).json({ error: '包名不能为空' });
 
     try {
-      const result = getDb().prepare('INSERT INTO packages (name, description, homepage) VALUES (?, ?, ?)').run(name, description || '', homepage || '');
-      const pkgId = Number(result.lastInsertRowid);
-      const pkg = getDb().prepare('SELECT * FROM packages WHERE id = ?').get(pkgId);
+      getDb().prepare('INSERT INTO packages (name, description, homepage) VALUES (?, ?, ?)').run(name, description || '', homepage || '');
+      // Query by name instead of using lastInsertRowid (sql.js bug)
+      const pkg = getDb().prepare('SELECT * FROM packages WHERE name = ?').get(name);
       res.status(201).json(pkg);
     } catch (err: any) {
       if (err.message?.includes('UNIQUE') || err.message?.includes('unique')) {
