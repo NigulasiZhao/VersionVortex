@@ -1,4 +1,4 @@
-# VersionManage
+# VersionVortex
 
 版本发布管理平台，类似 GitHub Releases，支持版本查看、包下载、管理后台登录、版本维护、Jenkins 一键发版。
 
@@ -21,7 +21,7 @@
 ## 项目结构
 
 ```
-VersionManage/
+VersionVortex/
 ├── frontend/                 # 前端应用
 │   └── src/
 │       ├── pages/           # 页面组件

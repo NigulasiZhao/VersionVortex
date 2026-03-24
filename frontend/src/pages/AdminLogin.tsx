@@ -45,7 +45,7 @@ export default function AdminLogin() {
           </div>
           <CardTitle className="text-2xl font-bold text-white">管理后台</CardTitle>
           <CardDescription className="text-gray-400">
-            VersionManage 版本管理平台
+            VersionVortex 版本管理平台
           </CardDescription>
         </CardHeader>
         <CardContent>

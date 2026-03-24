@@ -1,4 +1,4 @@
-# VersionManage - 版本发布管理平台
+# VersionVortex - 版本发布管理平台
 
 ## 项目概述
 类似 GitHub Releases 的版本管理平台，支持版本查看、包下载、管理后台登录、版本维护和包上传。

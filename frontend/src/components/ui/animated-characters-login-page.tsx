@@ -321,7 +321,7 @@ export function AnimatedCharactersLoginPage() {
             <div className="size-8 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center">
               <Sparkles className="size-4" />
             </div>
-            <span>VersionManage</span>
+            <span>VersionVortex</span>
           </div>
         </div>
 
@@ -525,7 +525,7 @@ export function AnimatedCharactersLoginPage() {
             <div className="size-8 rounded-lg bg-[#6C3FF5]/10 flex items-center justify-center">
               <Sparkles className="size-4 text-[#6C3FF5]" />
             </div>
-            <span>VersionManage</span>
+            <span>VersionVortex</span>
           </div>
 
           {/* Header */}

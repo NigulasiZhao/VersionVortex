@@ -36,7 +36,7 @@ export default function Layout() {
               <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-all" style={{ background: 'linear-gradient(135deg, #6C3FF5 0%, #8B5CF6 100%)' }}>
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
-              <span className="font-semibold text-sm text-[var(--color-fg-default)] group-hover:text-[#6C3FF5] transition-colors">VersionManage</span>
+              <span className="font-semibold text-sm text-[var(--color-fg-default)] group-hover:text-[#6C3FF5] transition-colors">VersionVortex</span>
             </Link>
             {isAdminPage && (
               <>
@@ -79,7 +79,7 @@ export default function Layout() {
       {/* Footer */}
       <footer className="border-t py-6 text-center text-xs text-[var(--color-fg-muted)]">
         <div className="max-w-6xl mx-auto px-4">
-          VersionManage © {new Date().getFullYear()} · 开源版本管理平台
+          VersionVortex © {new Date().getFullYear()} · 开源版本管理平台
         </div>
       </footer>
     </div>
