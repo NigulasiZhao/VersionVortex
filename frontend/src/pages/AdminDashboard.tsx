@@ -625,6 +625,9 @@ export default function AdminDashboard() {
           {tab === 'packages' && (
             <PackageModal onAdded={(pkg) => setPackages((prev) => [...prev, pkg])} />
           )}
+          {tab === 'users' && (
+            <UserModal onAdded={(user) => setUsers((prev) => [...prev, user])} />
+          )}
         </div>
 
         {/* Table */}
@@ -648,7 +651,6 @@ export default function AdminDashboard() {
               users={users}
               onDelete={(id) => setDeleteConfirm({ open: true, type: 'user', id, name: '' })}
               deleting={deleting}
-              onAdded={(user) => setUsers((prev) => [...prev, user])}
             />
           )}
         </div>
@@ -864,17 +866,13 @@ function PackageModal({ onAdded }: { onAdded: (pkg: Package) => void }) {
   );
 }
 
-function UsersTable({ users, onDelete, deleting, onAdded }: {
+function UsersTable({ users, onDelete, deleting }: {
   users: User[];
   onDelete: (id: number) => void;
   deleting: number | null;
-  onAdded: (user: User) => void;
 }) {
   return (
     <>
-      <div className="p-4 flex justify-end">
-        <UserModal onAdded={onAdded} />
-      </div>
       {users.length === 0 ? (
         <div className="text-center py-12 text-[var(--color-fg-muted)] text-sm">
           暂无用户，点击右上角「新建用户」创建
