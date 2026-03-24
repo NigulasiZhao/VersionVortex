@@ -201,7 +201,7 @@ export function Particles({ visible = true }: { visible?: boolean }) {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 0,
+        zIndex: -1,
         background: "linear-gradient(to bottom, #f8fafc 0%, #f1f5f9 60%, #ede9fe 100%)",
         overflow: "hidden",
         pointerEvents: "none",
