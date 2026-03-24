@@ -24,6 +24,7 @@ import type { Release, Package, AdminStats, User, JenkinsConfig, BuildSession } 
 import { ChevronDown, ChevronUp, Rocket, Loader2, CheckCircle2, XCircle, Clock, Download, AlertCircle } from 'lucide-react';
 import { SimpleDialog } from '../components/ui/form-dialog';
 import { FormDialog } from '../components/ui/form-dialog';
+import { useToast } from '../components/ui/toast';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('zh-CN', {
@@ -264,6 +265,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<'releases' | 'packages' | 'users'>('releases');
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const { showToast } = useToast();
 
   // 删除确认弹框状态
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -392,8 +394,9 @@ export default function AdminDashboard() {
     try {
       await deleteRelease(deleteConfirm.id);
       setReleases((prev) => prev.filter((r) => r.id !== deleteConfirm.id));
+      showToast('success', '版本删除成功');
     } catch {
-      alert('删除失败');
+      showToast('error', '删除失败');
     } finally {
       setDeleting(null);
       setDeleteConfirm(null);
@@ -406,8 +409,9 @@ export default function AdminDashboard() {
     try {
       await deletePackage(deleteConfirm.id);
       setPackages((prev) => prev.filter((p) => p.id !== deleteConfirm.id));
+      showToast('success', '软件包删除成功');
     } catch {
-      alert('删除失败');
+      showToast('error', '删除失败');
     } finally {
       setDeleting(null);
       setDeleteConfirm(null);
@@ -420,8 +424,9 @@ export default function AdminDashboard() {
     try {
       await deleteUser(deleteConfirm.id);
       setUsers((prev) => prev.filter((u) => u.id !== deleteConfirm.id));
+      showToast('success', '用户删除成功');
     } catch (err: any) {
-      alert(err.response?.data?.error || '删除失败');
+      showToast('error', err.response?.data?.error || '删除失败');
     } finally {
       setDeleting(null);
       setDeleteConfirm(null);
@@ -824,6 +829,7 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
 function PackageModal({ onAdded }: { onAdded: (pkg: Package) => void }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   const handleSubmit = async (values: Record<string, string>) => {
     setLoading(true);
@@ -834,6 +840,10 @@ function PackageModal({ onAdded }: { onAdded: (pkg: Package) => void }) {
         homepage: values.homepage
       });
       onAdded(pkg);
+      showToast('success', '软件包创建成功');
+      setOpen(false);
+    } catch (err: any) {
+      showToast('error', err.response?.data?.error || '创建失败');
     } finally {
       setLoading(false);
     }
@@ -922,6 +932,7 @@ function UsersTable({ users, onDelete, deleting }: {
 function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   const handleSubmit = async (values: Record<string, string>) => {
     setLoading(true);
@@ -934,6 +945,10 @@ function UserModal({ onAdded }: { onAdded: (user: User) => void }) {
       // Refresh the users list since API returns empty body
       const users = await getAdminUsers();
       onAdded(users[0]); // The newly created user will be first (sorted by created_at DESC)
+      showToast('success', '用户创建成功');
+      setOpen(false);
+    } catch (err: any) {
+      showToast('error', err.response?.data?.error || '创建失败');
     } finally {
       setLoading(false);
     }

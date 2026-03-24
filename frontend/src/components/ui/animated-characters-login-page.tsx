@@ -9,6 +9,7 @@ import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { adminLogin } from "@/services/api";
+import { useToast } from "@/components/ui/toast";
 
 interface PupilProps {
   size?: number;
@@ -175,8 +176,8 @@ export function AnimatedCharactersLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { showToast } = useToast();
   const [mouseX, setMouseX] = useState<number>(0);
   const [mouseY, setMouseY] = useState<number>(0);
   const [isPurpleBlinking, setIsPurpleBlinking] = useState(false);
@@ -296,7 +297,6 @@ export function AnimatedCharactersLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setIsLoading(true);
 
     try {
@@ -306,7 +306,7 @@ export function AnimatedCharactersLoginPage() {
       localStorage.setItem('vm_role', data.role || 'user');
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || "登录失败，请重试");
+      showToast('error', err.response?.data?.error || "登录失败，请重试");
     } finally {
       setIsLoading(false);
     }
@@ -587,12 +587,6 @@ export function AnimatedCharactersLoginPage() {
                 记住我 30 天
               </Label>
             </div>
-
-            {error && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">
-                {error}
-              </div>
-            )}
 
             <Button
               type="submit"

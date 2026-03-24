@@ -13,6 +13,7 @@ import type { Package, Release, Asset } from '../types';
 import { ArrowLeft, Upload } from 'lucide-react';
 import { SimpleDialog } from '../components/ui/form-dialog';
 import { Button } from '../components/ui/button';
+import { useToast } from '../components/ui/toast';
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B';
@@ -39,11 +40,10 @@ export default function VersionEdit() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAssetId, setDeletingAssetId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     getAdminPackages().then(setPackages);
@@ -71,22 +71,21 @@ export default function VersionEdit() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!packageId || !tagName) {
-      setError('请填写必填项');
+      showToast('error', '请填写必填项');
       return;
     }
-    setError('');
     setSaving(true);
     try {
       if (isEdit) {
         await updateRelease(Number(id), { title, body, is_draft: isDraft, is_prerelease: isPrerelease });
-        setSuccess('版本已更新');
+        showToast('success', '版本已更新');
       } else {
         const result = await createRelease({ package_id: packageId, tag_name: tagName, title, body, is_draft: isDraft, is_prerelease: isPrerelease });
-        setSuccess('版本已创建');
+        showToast('success', '版本已创建');
         setTimeout(() => navigate(`/admin/releases/${result.id}/edit`), 1000);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || '保存失败');
+      showToast('error', err.response?.data?.error || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -99,9 +98,9 @@ export default function VersionEdit() {
     try {
       const asset = await uploadAsset(Number(id), file);
       setAssets((prev) => [...prev, asset]);
-      setSuccess('文件上传成功');
+      showToast('success', '文件上传成功');
     } catch {
-      setError('文件上传失败');
+      showToast('error', '文件上传失败');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -118,8 +117,9 @@ export default function VersionEdit() {
     try {
       await deleteAsset(deletingAssetId);
       setAssets((prev) => prev.filter((a) => a.id !== deletingAssetId));
+      showToast('success', '文件已删除');
     } catch {
-      setError('删除文件失败');
+      showToast('error', '删除文件失败');
     } finally {
       setDeleteDialogOpen(false);
       setDeletingAssetId(null);
@@ -174,17 +174,6 @@ export default function VersionEdit() {
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
-          <div className="mb-4 text-sm text-[var(--color-danger-fg)] bg-[rgba(248,81,73,0.1)] border border-[rgba(248,81,73,0.3)] rounded-lg px-4 py-3 animate-fade-in">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-4 text-sm border rounded-lg px-4 py-3 animate-fade-in" style={{ color: '#1a7f37', background: 'rgba(63,185,80,0.1)', borderColor: 'rgba(63,185,80,0.3)' }}>
-            {success}
-          </div>
-        )}
-
         <form onSubmit={handleSave} className="space-y-6">
           {/* Basic Info */}
           <div className="border border-[var(--color-border-default)] rounded-xl p-5 animate-fade-in" style={{ background: 'var(--color-canvas-subtle)' }}>

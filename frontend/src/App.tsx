@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import Layout from './components/Layout';
 import { Particles } from './components/Particles';
+import { ToastProvider } from './components/ui/toast';
 import Home from './pages/Home';
 import ReleaseDetail from './pages/ReleaseDetail';
 import AdminLogin from './pages/AdminLogin';
@@ -173,7 +174,9 @@ function AnimatedRoutes() {
 function App() {
   return (
     <BrowserRouter>
-      <AnimatedRoutes />
+      <ToastProvider>
+        <AnimatedRoutes />
+      </ToastProvider>
     </BrowserRouter>
   );
 }

@@ -6,17 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { adminLogin } from '@/services/api';
+import { useToast } from '@/components/ui/toast';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
     try {
       const data = await adminLogin(username, password);
@@ -24,7 +24,7 @@ export default function AdminLogin() {
       localStorage.setItem('vm_username', data.username);
       navigate('/admin');
     } catch (err: any) {
-      setError(err.response?.data?.error || '登录失败，请重试');
+      showToast('error', err.response?.data?.error || '登录失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -75,12 +75,6 @@ export default function AdminLogin() {
                 className="bg-white/10 border-white/20 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500"
               />
             </div>
-
-            {error && (
-              <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                {error}
-              </div>
-            )}
 
             <Button
               type="submit"
