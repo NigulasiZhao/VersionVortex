@@ -9,9 +9,14 @@
     "dev": "node start.js",
     "dev:backend": "npm run dev -w backend",
     "dev:frontend": "npm run dev -w frontend",
-    "start": "node start.js"
+    "start": "node start.js",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "npm run test -w frontend",
+    "test:backend": "npm run test -w backend",
+    "test:e2e": "npx playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "concurrently": "^8.2.2",
     "tsx": "^3.14.0"
   }

@@ -143,3 +143,69 @@ npm run build -w frontend
 # 构建后端
 npm run build -w backend
 ```
+
+## 测试
+
+项目包含完整的测试基础设施，覆盖前端、后端和 E2E 测试。
+
+### 测试框架
+
+| 层级 | 框架 | 工具 |
+|------|------|------|
+| 前端单元测试 | Vitest | happy-dom, @testing-library/react |
+| 后端单元测试 | Jest | ts-jest, supertest |
+| E2E 自动化 | Playwright | @playwright/test |
+
+### 运行测试
+
+```bash
+# 运行所有测试（前端 + 后端）
+npm test
+
+# 仅运行前端测试
+npm run test:frontend
+
+# 仅运行后端测试
+npm run test:backend
+
+# 运行 E2E 测试（需 Node 18+）
+npm run test:e2e
+```
+
+### 测试用例
+
+**前端测试 (35 tests)**
+```
+frontend/src/__tests__/utils/
+├── formatBytes.test.ts       # 文件大小格式化 (6 tests)
+├── groupByMonth.test.ts      # 版本按月分组 (8 tests)
+└── parseMarkdown.test.ts     # Markdown 解析 (9 tests)
+
+frontend/src/__tests__/components/
+├── Timeline.test.tsx         # 时间线组件 (6 tests)
+└── FormDialog.test.tsx      # 表单弹框组件 (6 tests)
+```
+
+**后端测试 (21 tests)**
+```
+backend/src/__tests__/utils/
+├── incrementVersion.test.ts   # 版本号递增 (11 tests)
+└── matchGlob.test.ts        # 文件名模式匹配 (10 tests)
+```
+
+**E2E 测试 (10 tests)**
+```
+e2e/tests/
+├── home.spec.ts             # 首页测试 (5 tests)
+└── admin.spec.ts           # 管理后台测试 (5 tests)
+```
+
+### 测试配置
+
+| 文件 | 用途 |
+|------|------|
+| `frontend/vitest.config.ts` | Vitest 配置 |
+| `frontend/setup-vitest.ts` | 前端测试环境设置 |
+| `backend/jest.config.js` | Jest 配置 |
+| `backend/setup-jest.ts` | 后端测试环境设置 |
+| `e2e/playwright.config.ts` | Playwright E2E 配置 |
