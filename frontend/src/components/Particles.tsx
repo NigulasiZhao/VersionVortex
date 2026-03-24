@@ -173,7 +173,7 @@ const Explosion = ({ ...props }: React.HTMLProps<HTMLDivElement>) => {
   );
 };
 
-export function Particles() {
+export function Particles({ visible = true }: { visible?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const parentRef = useRef<HTMLDivElement>(null);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -205,6 +205,8 @@ export function Particles() {
         background: "linear-gradient(to bottom, #f8fafc 0%, #f1f5f9 60%, #ede9fe 100%)",
         overflow: "hidden",
         pointerEvents: "none",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.3s ease",
       }}
     >
       {beams.map((beam, idx) => (

@@ -68,9 +68,10 @@ function AnimatedRoutes() {
   const showParticles = !location.pathname.startsWith('/admin');
 
   return (
-    <AnimatePresence mode="wait">
-      {showParticles && <Particles />}
-      <Routes location={location} key={location.pathname}>
+    <>
+      <Particles visible={showParticles} />
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
         {/* Public routes - require authentication */}
         <Route element={<RequireAuth><Layout /></RequireAuth>}>
           <Route path="/" element={
@@ -165,6 +166,7 @@ function AnimatedRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
+    </>
   );
 }
 
