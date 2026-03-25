@@ -5,18 +5,19 @@
 ## 技术栈
 
 ### 前端
-- React 18 + TypeScript
-- Vite 4.x
-- React Router v6
+- React
+- TypeScript
+- Vite
 - TailwindCSS
-- Framer Motion 动画
-- Radix UI (Dialog, AlertDialog)
+- Framer Motion
+- Radix UI
 
 ### 后端
-- Express + TypeScript
-- sql.js (SQLite in WASM)
-- JWT 认证
-- Multer 文件上传
+- Express
+- TypeScript
+- sql.js
+- JWT
+- Multer
 
 ## 项目结构
 
@@ -40,6 +41,73 @@ VersionVortex/
 ├── start.js                  # 启动脚本
 └── package.json              # 根配置
 ```
+
+## 使用说明
+
+### Jenkins 配置要求
+
+在配置一键发版前，需确保 Jenkins Job 满足以下条件：
+
+#### 1. 参数化构建
+Job 必须配置一个名为 `version` 的字符串参数，用于接收版本号：
+
+- 进入 Jenkins → Job → 配置 → 勾选"参数化构建过程"
+- 添加字符串参数，名称为 `version`
+
+#### 2. API Token
+需要为 Jenkins 用户生成 API Token：
+
+- Jenkins → 用户 → 设置 → API Token → 添加新 Token
+- 记录用户名和 Token，后续配置需要用到
+
+#### 3. 产物设置
+确保 Job 的产物路径匹配规则正确：
+
+- 构建产物（如 `*.zip`）需要发布到 Jenkins 工作空间
+- artifact_pattern 支持通配符，如 `*.zip`、`app-*.zip`、`dist/**/*`
+
+### 软件包管理
+
+#### 添加软件包
+
+1. 进入管理后台 → 软件包管理
+2. 点击"添加软件包"
+3. 填写信息：
+   - **名称**：如 `PNM-ConfigHub`
+   - **描述**：软件包说明
+   - **主页/Git 仓库**：代码仓库地址
+
+#### 配置 Jenkins
+
+1. 在软件包列表中，点击某包的"Jenkins 配置"按钮
+2. 填写配置：
+   - **Jenkins 地址**：如 `http://jenkins.example.com:8080`
+   - **Job 名称**：如 `PNM-ConfigHub-Build`
+   - **用户名**：Jenkins 用户名
+   - **API Token**：Jenkins 用户 API Token
+   - **产物匹配规则**：如 `*.zip`，用于匹配构建产物
+
+#### 一键发版流程
+
+1. 确保所有需要发版的软件包都已配置 Jenkins
+2. 进入版本管理页面
+3. 点击顶部"🚀 一键发版"按钮
+4. 系统自动：
+   - 计算下一个版本号（从最新版本累加）
+   - 并行触发所有已配置 Jenkins 的包
+   - 创建统一的版本记录
+5. 进度弹窗实时显示：
+   - 每个包的构建状态（触发中 → 构建中 → 下载产物 → 完成）
+   - 构建成功/失败状态
+   - 产物下载结果
+6. 构建完成后，版本自动出现在版本列表中
+
+#### 版本维护
+
+- **编辑版本**：修改版本标题、变更日志
+- **上传附件**：手动上传构建产物
+- **删除版本**：同时删除关联的附件文件
+- **草稿模式**：可先保存为草稿，确认后再发布
 
 ## 快速开始
 
@@ -302,17 +370,3 @@ packages (1) ←→ (N) build_packages
 releases (1) ←→ (N) assets
 build_sessions (1) ←→ (N) build_packages
 ```
-
-## 前端组件说明
-
-### Timeline 版本卡片 Markdown 解析
-
-文件: `frontend/src/components/ui/Timeline.tsx`
-
-`parseMarkdownToText(body)` 函数将 Markdown 格式的变更日志转为友好文本：
-
-- 过滤 `#`、`##`、`###` 标题行
-- 列表项 `- xxx` 转为 `• xxx`
-- 粗体 `**xxx**` 转为 `xxx`
-- `line-clamp-2` 限制显示 2 行
-- `min-h-[2.5rem]` 统一卡片高度

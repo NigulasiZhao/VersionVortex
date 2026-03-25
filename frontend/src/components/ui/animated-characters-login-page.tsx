@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Sparkles, Github } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { adminLogin } from "@/services/api";
@@ -496,15 +496,15 @@ export function AnimatedCharactersLoginPage() {
           </div>
         </div>
 
-        <div className="relative z-20 flex items-center gap-8 text-sm text-white/60">
-          <a href="#" className="hover:text-white transition-colors">
-            Privacy Policy
-          </a>
-          <a href="#" className="hover:text-white transition-colors">
-            Terms of Service
-          </a>
-          <a href="#" className="hover:text-white transition-colors">
-            Contact
+        <div className="relative z-20 flex items-center gap-6">
+          <a
+            href="https://github.com/NigulasiZhao/VersionVortex"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 border border-white/20 hover:border-white/40"
+          >
+            <Github className="size-4" />
+            <span>View on GitHub</span>
           </a>
         </div>
 
