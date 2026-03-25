@@ -3,6 +3,35 @@ import { Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FluidDropdown } from "./FluidDropdown";
 
+// 简单的 Markdown 解析为友好文本
+function parseMarkdownToText(body) {
+  if (!body) return "暂无变更说明";
+
+  const lines = body.split("\n").filter((l) => {
+    const trimmed = l.trim();
+    // 过滤所有标题行 (#, ##, ###) 和空行
+    return trimmed && !trimmed.startsWith("#");
+  });
+
+  // 取前3个有效行
+  const preview = lines.slice(0, 3);
+
+  return preview.map((line) => {
+    let text = line.trim();
+
+    // 处理列表项 (- 或 * 开头)
+    const listMatch = text.match(/^[-*]\s+(.+)/);
+    if (listMatch) {
+      text = "• " + listMatch[1];
+    }
+
+    // 处理粗体 **text**
+    text = text.replace(/\*\*(.+?)\*\*/g, "$1");
+
+    return text;
+  }).join(" · ");
+}
+
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("zh-CN", {
     year: "numeric",
@@ -119,15 +148,9 @@ function ReleaseCard({ release, isLatest }) {
         )}
       </div>
 
-      {release.body && (
-        <p className="text-sm line-clamp-2 leading-relaxed" style={{ color: "var(--color-fg-muted)" }}>
-          {release.body
-            .split("\n")
-            .filter((l) => l.trim() && !l.startsWith("#"))
-            .slice(0, 3)
-            .join(" · ")}
-        </p>
-      )}
+      <p className="text-sm line-clamp-2 leading-relaxed min-h-[2.5rem]" style={{ color: "var(--color-fg-muted)" }}>
+        {parseMarkdownToText(release.body)}
+      </p>
 
       <div className="h-0.5 w-full mt-4 rounded-full overflow-hidden" style={{ background: "var(--color-canvas-subtle)" }}>
         <div
