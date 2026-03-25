@@ -209,3 +209,146 @@ e2e/tests/
 | `backend/jest.config.js` | Jest 配置 |
 | `backend/setup-jest.ts` | 后端测试环境设置 |
 | `e2e/playwright.config.ts` | Playwright E2E 配置 |
+
+## 数据库
+
+**数据库类型**: sql.js (SQLite in WASM)
+**数据文件**: `backend/data.db`
+**自动保存**: 每 30 秒自动持久化到文件
+
+### 表结构
+
+#### users (用户表)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PRIMARY KEY | 主键 |
+| username | TEXT UNIQUE NOT NULL | 用户名 |
+| password_hash | TEXT NOT NULL | 密码（bcrypt加密） |
+| role | TEXT DEFAULT 'admin' | 角色 |
+| created_at | DATETIME | 创建时间 |
+
+**默认账号**: admin / admin123
+
+#### packages (软件包表)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PRIMARY KEY | 主键 |
+| name | TEXT UNIQUE NOT NULL | 包名 |
+| description | TEXT | 描述 |
+| homepage | TEXT | 主页/Git仓库地址 |
+| created_at | DATETIME | 创建时间 |
+
+#### releases (版本表)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PRIMARY KEY | 主键 |
+| package_id | INTEGER NOT NULL | 外键关联 packages |
+| tag_name | TEXT NOT NULL | 版本号（如 1.0.0） |
+| title | TEXT | 版本标题 |
+| body | TEXT | 变更日志（Markdown格式） |
+| is_draft | INTEGER DEFAULT 0 | 是否草稿 |
+| is_prerelease | INTEGER DEFAULT 0 | 是否预发布 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+**唯一约束**: (package_id, tag_name)
+
+#### assets (下载文件表)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PRIMARY KEY | 主键 |
+| release_id | INTEGER NOT NULL | 外键关联 releases |
+| package_id | INTEGER | 关联的包ID |
+| name | TEXT NOT NULL | 文件名 |
+| size | INTEGER NOT NULL | 文件大小(字节) |
+| download_count | INTEGER DEFAULT 0 | 下载次数 |
+| file_path | TEXT NOT NULL | 文件路径 |
+| created_at | DATETIME | 创建时间 |
+
+#### jenkins_configs (Jenkins配置表)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PRIMARY KEY | 主键 |
+| package_id | INTEGER UNIQUE NOT NULL | 外键关联 packages |
+| jenkins_url | TEXT NOT NULL | Jenkins 地址 |
+| job_name | TEXT NOT NULL | Job 名称 |
+| username | TEXT NOT NULL | Jenkins 用户名 |
+| api_token | TEXT NOT NULL | Jenkins API Token |
+| artifact_pattern | TEXT DEFAULT '*.zip' | 产物匹配模式 |
+| created_at | DATETIME | 创建时间 |
+
+#### build_sessions (构建会话表)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | TEXT PRIMARY KEY | 会话ID（UUID） |
+| tag_name | TEXT NOT NULL | 版本号 |
+| status | TEXT DEFAULT 'running' | 状态 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+#### build_packages (构建包状态表)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PRIMARY KEY | 主键 |
+| session_id | TEXT NOT NULL | 外键关联 build_sessions |
+| package_id | INTEGER NOT NULL | 外键关联 packages |
+| package_name | TEXT NOT NULL | 包名 |
+| status | TEXT DEFAULT 'pending' | 状态 |
+| progress | INTEGER DEFAULT 0 | 进度百分比 |
+| build_number | INTEGER | Jenkins 构建号 |
+| error | TEXT | 错误信息 |
+| artifact_names | TEXT | 产物名称列表 |
+| artifact_sizes | TEXT | 产物大小列表 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+### ER 关系
+
+```
+users (无外键)
+packages (1) ←→ (N) releases
+packages (1) ←→ (N) jenkins_configs
+packages (1) ←→ (N) build_packages
+releases (1) ←→ (N) assets
+build_sessions (1) ←→ (N) build_packages
+```
+
+## 数据初始化脚本
+
+### merge_versions.js
+
+数据合并脚本，用于生成按每半月汇总的版本数据：
+
+```bash
+node merge_versions.js
+```
+
+**功能说明**:
+- 保留现有的 2.1.21 版本
+- 删除旧的 1.0.x 单独版本
+- 按每半月周期生成 1.0.0 ~ 1.0.13 共 14 个版本
+- 每个版本包含三个项目的合并变更日志（PNM-ConfigHub、PNM-InsWeb、PNM-Server）
+- 每个版本关联 7 个下载包（来自 2.1.21）
+
+**输出示例**:
+```
+时间段: 14
+1.0.0: ConfigHub(18), InsWeb(7), Server(22)
+1.0.1: ConfigHub(11), InsWeb(14), Server(32)
+...
+最终: 15 版本, 105 assets, 2546 下载
+```
+
+## 前端组件说明
+
+### Timeline 版本卡片 Markdown 解析
+
+文件: `frontend/src/components/ui/Timeline.tsx`
+
+`parseMarkdownToText(body)` 函数将 Markdown 格式的变更日志转为友好文本：
+
+- 过滤 `#`、`##`、`###` 标题行
+- 列表项 `- xxx` 转为 `• xxx`
+- 粗体 `**xxx**` 转为 `xxx`
+- `line-clamp-2` 限制显示 2 行
+- `min-h-[2.5rem]` 统一卡片高度
