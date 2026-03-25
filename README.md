@@ -303,32 +303,6 @@ releases (1) ←→ (N) assets
 build_sessions (1) ←→ (N) build_packages
 ```
 
-## 数据初始化脚本
-
-### merge_versions.js
-
-数据合并脚本，用于生成按每半月汇总的版本数据：
-
-```bash
-node merge_versions.js
-```
-
-**功能说明**:
-- 保留现有的 2.1.21 版本
-- 删除旧的 1.0.x 单独版本
-- 按每半月周期生成 1.0.0 ~ 1.0.13 共 14 个版本
-- 每个版本包含三个项目的合并变更日志（PNM-ConfigHub、PNM-InsWeb、PNM-Server）
-- 每个版本关联 7 个下载包（来自 2.1.21）
-
-**输出示例**:
-```
-时间段: 14
-1.0.0: ConfigHub(18), InsWeb(7), Server(22)
-1.0.1: ConfigHub(11), InsWeb(14), Server(32)
-...
-最终: 15 版本, 105 assets, 2546 下载
-```
-
 ## 前端组件说明
 
 ### Timeline 版本卡片 Markdown 解析
