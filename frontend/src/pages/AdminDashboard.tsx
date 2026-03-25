@@ -91,13 +91,12 @@ function BuildProgressPanel({
         >
           <motion.div
             layout
-            className="border rounded-xl shadow-2xl"
+            className="border rounded-xl shadow-2xl overflow-hidden"
             style={{
               background: 'var(--color-canvas-subtle)',
               borderColor: 'var(--color-border-default)',
               width: isCollapsed ? '280px' : '360px',
-              maxHeight: isCollapsed ? 'none' : '70vh',
-              overflow: isCollapsed ? 'visible' : 'hidden'
+              maxHeight: isCollapsed ? 'none' : '70vh'
             }}
           >
             {/* 头部 */}
@@ -279,7 +278,7 @@ export default function AdminDashboard() {
   const [buildSession, setBuildSession] = useState<BuildSession | null>(null);
   const [buildLoading, setBuildLoading] = useState(false);
   const [buildError, setBuildError] = useState('');
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const pollIntervalRef = useRef<number | null>(null);
   const pollBuildSessionRef = useRef<((sessionId: string) => void) | null>(null);
   const isRestoredRef = useRef(false);
