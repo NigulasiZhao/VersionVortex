@@ -1,6 +1,6 @@
 # VersionVortex
 
-版本发布管理平台，类似 GitHub Releases，支持版本查看、包下载、管理后台登录、版本维护、Jenkins 一键发版。
+版本发布管理平台，支持版本查看、包下载、管理后台登录、版本维护、Jenkins 一键发版。
 
 ## 技术栈
 
@@ -133,16 +133,6 @@ npm run dev
 | GET | /api/admin/jenkins-build/history | 获取构建历史 |
 
 > 注意：一键发版任务会话持久化到数据库，刷新页面后自动恢复。
-
-## 构建生产版本
-
-```bash
-# 构建前端
-npm run build -w frontend
-
-# 构建后端
-npm run build -w backend
-```
 
 ## 测试
 
