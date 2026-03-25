@@ -34,3 +34,11 @@ npm-debug.log*
 
 # Claude
 .claude/
+
+# Test reports
+playwright-report/
+
+# Temp files
+2.png
+beijing.txt
+*.tmp
