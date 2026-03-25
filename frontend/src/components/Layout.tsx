@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Github } from 'lucide-react';
 
 export default function Layout() {
   const location = useLocation();
@@ -79,7 +79,10 @@ export default function Layout() {
       {/* Footer */}
       <footer className="border-t py-6 text-center text-xs text-[var(--color-fg-muted)]">
         <div className="max-w-6xl mx-auto px-4">
-          VersionVortex © {new Date().getFullYear()} · 开源版本管理平台
+          <a href="https://github.com/NigulasiZhao/VersionVortex" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity">
+            VersionVortex © {new Date().getFullYear()} · 开源版本管理平台
+            <Github className="w-3 h-3" />
+          </a>
         </div>
       </footer>
     </div>
