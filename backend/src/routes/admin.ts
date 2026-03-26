@@ -50,6 +50,35 @@ router.post('/logout', authenticateToken, requireAdmin, (_req: AuthRequest, res:
   res.json({ message: '登出成功' });
 });
 
+// POST /api/admin/change-password - Change password
+router.post('/change-password', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
+  try {
+    const { username, oldPassword, newPassword } = req.body;
+    if (!username || !oldPassword || !newPassword) {
+      return res.status(400).json({ error: '参数不完整' });
+    }
+
+    const user = getDb().prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
+    if (!user) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+
+    // Verify old password
+    if (!bcrypt.compareSync(oldPassword, user.password_hash)) {
+      return res.status(401).json({ error: '当前密码错误' });
+    }
+
+    // Hash and update new password
+    const newPasswordHash = bcrypt.hashSync(newPassword, 10);
+    getDb().prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(newPasswordHash, username);
+
+    res.json({ message: '密码修改成功' });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ error: '修改密码失败' });
+  }
+});
+
 // GET /api/admin/releases - Get all releases (including drafts)
 router.get('/releases', authenticateToken, requireAdmin, (_req: AuthRequest, res: Response) => {
   try {

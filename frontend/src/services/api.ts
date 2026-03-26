@@ -34,8 +34,25 @@ export const getRelease = (tag: string) => api.get(`/releases/${tag}`).then((r) 
 export const getPackages = () => api.get('/packages').then((r) => r.data);
 export const getPackageReleases = (name: string) => api.get(`/packages/${name}/releases`).then((r) => r.data);
 export const getStats = () => api.get('/stats').then((r) => r.data);
-export const downloadAsset = (id: number) => {
-  window.open(`/api/assets/${id}/download`, '_blank');
+export const downloadAsset = async (id: number) => {
+  try {
+    const token = localStorage.getItem('vm_token');
+    const response = await fetch(`/api/assets/${id}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Download failed');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Download error:', err);
+  }
 };
 
 // Admin APIs
@@ -68,6 +85,10 @@ export const getAdminUsers = () => api.get('/admin/users').then((r) => r.data);
 export const createUser = (data: { username: string; password: string; role?: string }) =>
   api.post('/admin/users', data).then((r) => r.data);
 export const deleteUser = (id: number) => api.delete(`/admin/users/${id}`).then((r) => r.data);
+
+// Change password
+export const adminChangePassword = (username: string, oldPassword: string, newPassword: string) =>
+  api.post('/admin/change-password', { username, oldPassword, newPassword }).then((r) => r.data);
 
 // Jenkins CI APIs
 export const getJenkinsConfigs = () => api.get('/admin/jenkins-configs').then((r) => r.data);

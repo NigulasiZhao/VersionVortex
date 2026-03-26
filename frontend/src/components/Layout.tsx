@@ -1,12 +1,14 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { Sparkles, Github } from 'lucide-react';
+import { UserDropdown } from "@/components/ui/user-dropdown";
+import MotionButton from "@/components/ui/motion-button";
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState('');
 
   const isAdminPage = location.pathname.startsWith('/admin');
 
@@ -16,7 +18,7 @@ export default function Layout() {
     if (storedUsername) {
       setUsername(storedUsername);
     }
-    setIsAdmin(storedRole === 'admin');
+    setRole(storedRole || '');
   }, []);
 
   const handleLogout = () => {
@@ -46,27 +48,17 @@ export default function Layout() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-[var(--color-fg-muted)] hidden sm:inline">{username}</span>
-            {isAdmin && (
-              <Link
+            {role === 'admin' && (
+              <MotionButton
+                label={isAdminPage ? "查看前台" : "管理后台"}
                 to={isAdminPage ? "/" : "/admin"}
-                className="text-xs text-[var(--color-fg-muted)] hover:text-[#6C3FF5] no-underline px-3 py-1.5 rounded-md border transition-all"
-                style={{ borderColor: 'var(--color-border-default)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6C3FF5'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; }}
-              >
-                {isAdminPage ? "查看前台" : "管理后台"}
-              </Link>
+                variant="secondary"
+              />
             )}
-            <button
-              onClick={handleLogout}
-              className="text-xs text-[var(--color-fg-muted)] hover:text-[var(--color-danger-fg)] px-3 py-1.5 rounded-md border transition-all"
-              style={{ borderColor: 'var(--color-border-default)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-danger-fg)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; }}
-            >
-              退出登录
-            </button>
+            <UserDropdown
+              username={username}
+              onLogout={handleLogout}
+            />
           </div>
         </div>
       </header>
