@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ReleaseButton } from "@/components/ui/release-button";
 import { HoverTabs } from "@/components/ui/hover-tabs";
+import { AnimatedTableRow } from "@/components/ui/animated-table";
 import {
   getAdminReleases,
   getAdminPackages,
@@ -701,8 +702,8 @@ function ReleasesTable({ releases, onDelete, deleting }: {
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--color-border-muted)]">
-        {releases.map((release) => (
-          <tr key={release.id} className="hover:bg-[var(--color-canvas-default)] transition-colors">
+        {releases.map((release, index) => (
+          <AnimatedTableRow key={release.id} index={index}>
             <td className="px-4 py-3">
               <div className="font-mono font-medium" style={{ color: '#6C3FF5' }}>{release.tag_name}</div>
               {release.title && <div className="text-xs text-[var(--color-fg-muted)] mt-0.5 truncate max-w-[200px]">{release.title}</div>}
@@ -739,7 +740,7 @@ function ReleasesTable({ releases, onDelete, deleting }: {
                 </button>
               </div>
             </td>
-          </tr>
+          </AnimatedTableRow>
         ))}
       </tbody>
     </table>
@@ -772,8 +773,8 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--color-border-muted)]">
-        {packages.map((pkg) => (
-          <tr key={pkg.id} className="hover:bg-[var(--color-canvas-default)] transition-colors">
+        {packages.map((pkg, index) => (
+          <AnimatedTableRow key={pkg.id} index={index}>
             <td className="px-4 py-3 font-mono font-medium" style={{ color: '#6C3FF5' }}>{pkg.name}</td>
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{pkg.description || '-'}</td>
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatDate(pkg.created_at)}</td>
@@ -798,7 +799,7 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
                 </button>
               </div>
             </td>
-          </tr>
+          </AnimatedTableRow>
         ))}
       </tbody>
     </table>
@@ -877,8 +878,8 @@ function UsersTable({ users, onDelete, deleting }: {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border-muted)]">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-[var(--color-canvas-default)] transition-colors">
+            {users.map((user, index) => (
+              <AnimatedTableRow key={user.id} index={index}>
                 <td className="px-4 py-3 font-medium text-[var(--color-fg-default)]">{user.username}</td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full border ${
@@ -899,7 +900,7 @@ function UsersTable({ users, onDelete, deleting }: {
                     {deleting === user.id ? '删除中' : '删除'}
                   </button>
                 </td>
-              </tr>
+              </AnimatedTableRow>
             ))}
           </tbody>
         </table>
