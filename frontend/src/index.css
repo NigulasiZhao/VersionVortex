@@ -55,6 +55,7 @@
   }
   html {
     scrollbar-gutter: stable;
+    overflow-y: scroll;
   }
   body {
     @apply bg-background text-foreground;
@@ -63,6 +64,7 @@
     background: transparent;
     position: relative;
     overflow-x: hidden;
+    overflow-y: scroll;
   }
 }
 
@@ -330,4 +332,19 @@ code, pre {
 .animate-gradient {
   background-size: 200% 200%;
   animation: gradientShift 8s ease infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(180deg);
+  }
+}
+
+.animate-sparkle {
+  animation: sparkle 1.5s ease-in-out infinite;
 }

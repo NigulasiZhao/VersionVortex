@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ReleaseButton } from "@/components/ui/release-button";
 import {
   getAdminReleases,
   getAdminPackages,
@@ -601,26 +602,18 @@ export default function AdminDashboard() {
           </div>
           {tab === 'releases' && (
             <div className="flex gap-2">
-              <button
+              <ReleaseButton
                 onClick={handleOneClickRelease}
                 disabled={buildLoading || buildSession?.overall_status === 'running' || Object.keys(jenkinsConfigs).length === 0}
-                className="text-xs px-4 py-2 rounded-lg text-white transition-all no-underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 animate-fade-in"
-                style={{ background: buildSession?.overall_status === 'running' ? '#A78BFA' : '#6C3FF5' }}
-                onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = '#5B35E0'; }}
-                onMouseLeave={(e) => e.currentTarget.style.background = buildSession?.overall_status === 'running' ? '#A78BFA' : '#6C3FF5'}
-              >
-                {buildLoading || buildSession?.overall_status === 'running' ? (
-                  <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />{buildSession?.overall_status === 'running' ? '发版中' : '构建中...'}</>
-                ) : (
-                  <>🚀 一键发版</>
-                )}
-              </button>
+                loading={buildLoading || buildSession?.overall_status === 'running'}
+                label="一键发版"
+              />
               <Link
                 to="/admin/releases/new"
-                className="text-xs px-4 py-2 rounded-lg border text-[var(--color-fg-muted)] transition-all no-underline animate-fade-in"
-                style={{ borderColor: 'var(--color-border-default)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6C3FF5'; e.currentTarget.style.color = '#6C3FF5'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; e.currentTarget.style.color = 'var(--color-fg-muted)'; }}
+                className="text-xs px-4 py-2 rounded-lg text-white transition-all no-underline animate-fade-in"
+                style={{ background: '#6C3FF5' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
               >
                 + 新建版本
               </Link>
