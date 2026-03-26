@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ReleaseButton } from "@/components/ui/release-button";
+import { HoverTabs } from "@/components/ui/hover-tabs";
 import {
   getAdminReleases,
   getAdminPackages,
@@ -585,21 +586,7 @@ export default function AdminDashboard() {
 
         {/* Tabs + New Button */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex gap-1">
-            {(['releases', 'packages', 'users'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-2 text-sm rounded-lg transition-all ${
-                  tab === t
-                    ? 'bg-[var(--color-canvas-subtle)] text-[var(--color-fg-default)] border border-[var(--color-border-default)]'
-                    : 'text-[var(--color-fg-muted)] hover:text-[var(--color-fg-default)]'
-                }`}
-              >
-                {t === 'releases' ? '版本管理' : t === 'packages' ? '软件包' : '用户管理'}
-              </button>
-            ))}
-          </div>
+          <HoverTabs activeTab={tab} onTabChange={setTab} />
           {tab === 'releases' && (
             <div className="flex gap-2">
               <ReleaseButton
