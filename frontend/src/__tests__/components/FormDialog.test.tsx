@@ -50,6 +50,26 @@ describe('FormDialog', () => {
     expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
+  it('should render textarea field', () => {
+    const fieldsWithTextarea: FormField[] = [
+      { id: 'content', label: 'Content', type: 'textarea', required: true },
+    ];
+
+    render(
+      <FormDialog
+        open={true}
+        onOpenChange={() => {}}
+        title="Textarea Dialog"
+        fields={fieldsWithTextarea}
+        onSubmit={mockOnSubmit}
+      />
+    );
+
+    const textareas = screen.getAllByRole('textbox');
+    expect(textareas).toHaveLength(1);
+    expect(textareas[0].tagName).toBe('TEXTAREA');
+  });
+
   it('should show required indicator for required fields', () => {
     render(
       <FormDialog
