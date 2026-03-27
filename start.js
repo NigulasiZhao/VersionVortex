@@ -26,7 +26,7 @@ const backend = spawn('node', ['dist/app.js'], {
 });
 
 // Start frontend dev server (use local vite in frontend/node_modules)
-const frontend = spawn('node', ['./node_modules/vite/bin/vite.js'], {
+const frontend = spawn('node', ['./node_modules/vite/bin/vite.js', '--host'], {
   cwd: path.join(rootDir, 'frontend'),
   stdio: 'inherit',
   shell: true,
