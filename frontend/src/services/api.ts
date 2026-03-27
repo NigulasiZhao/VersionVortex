@@ -77,6 +77,7 @@ export const deleteRelease = (id: number) => api.delete(`/admin/releases/${id}`)
 
 export const getAdminPackages = () => api.get('/admin/packages').then((r) => r.data);
 export const createPackage = (data: any) => api.post('/admin/packages', data).then((r) => r.data);
+export const updatePackage = (id: number, data: any) => api.put(`/admin/packages/${id}`, data).then((r) => r.data);
 export const deletePackage = (id: number) => api.delete(`/admin/packages/${id}`).then((r) => r.data);
 
 export const uploadAsset = (releaseId: number, file: File) => {

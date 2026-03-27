@@ -197,6 +197,13 @@ export async function initDb() {
     // Column may already exist, ignore
   }
 
+  // Migration: add alias column to packages
+  try {
+    db.exec("ALTER TABLE packages ADD COLUMN alias TEXT");
+  } catch (e: any) {
+    // Column may already exist, ignore
+  }
+
   // Seed default admin
   const adminExists = dbWrapper.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!adminExists) {

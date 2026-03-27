@@ -3,6 +3,7 @@ export interface Package {
   name: string;
   description: string;
   homepage: string;
+  alias?: string | null;
   created_at: string;
   release_count?: number;
   latest_tag?: string;

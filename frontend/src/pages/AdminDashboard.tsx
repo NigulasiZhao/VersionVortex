@@ -11,6 +11,7 @@ import {
   deleteRelease,
   deletePackage,
   createPackage,
+  updatePackage,
   getAdminUsers,
   createUser,
   deleteUser,
@@ -371,6 +372,7 @@ export default function AdminDashboard() {
   }, []);
 
   const [jenkinsConfigModal, setJenkinsConfigModal] = useState<{ open: boolean; pkg: Package | null }>({ open: false, pkg: null });
+  const [editPackageModal, setEditPackageModal] = useState<{ open: boolean; pkg: Package | null }>({ open: false, pkg: null });
 
   const load = () => {
     Promise.all([getAdminReleases(), getAdminPackages(), getAdminStats(), getAdminUsers(), getJenkinsConfigs()])
@@ -671,6 +673,7 @@ export default function AdminDashboard() {
               deleting={deleting}
               onConfigJenkins={(pkg) => setJenkinsConfigModal({ open: true, pkg })}
               onSingleRelease={(pkgId) => handleSingleRelease(pkgId)}
+              onEditPackage={(pkg) => setEditPackageModal({ open: true, pkg })}
             />
           ) : (
             <UsersTable
@@ -711,6 +714,18 @@ export default function AdminDashboard() {
               setJenkinsConfigModal({ open: false, pkg: null });
             }}
             onClose={() => setJenkinsConfigModal({ open: false, pkg: null })}
+          />
+        )}
+
+        {/* 编辑软件包弹窗 */}
+        {editPackageModal.open && editPackageModal.pkg && (
+          <EditPackageModal
+            pkg={editPackageModal.pkg}
+            onSaved={(updatedPkg) => {
+              setPackages((prev) => prev.map((p) => p.id === updatedPkg.id ? updatedPkg : p));
+              setEditPackageModal({ open: false, pkg: null });
+            }}
+            onClose={() => setEditPackageModal({ open: false, pkg: null })}
           />
         )}
 
@@ -844,13 +859,14 @@ function ReleasesTable({ releases, onDelete, deleting }: {
   );
 }
 
-function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJenkins, onSingleRelease }: {
+function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJenkins, onSingleRelease, onEditPackage }: {
   packages: Package[];
   jenkinsConfigs: Record<number, JenkinsConfig>;
   onDelete: (id: number) => void;
   deleting: number | null;
   onConfigJenkins: (pkg: Package) => void;
   onSingleRelease: (pkgId: number) => void;
+  onEditPackage: (pkg: Package) => void;
 }) {
   if (packages.length === 0) {
     return (
@@ -865,27 +881,28 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
       <thead>
         <tr className="border-b border-[var(--color-border-default)] text-left">
           <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider">名称</th>
+          <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider">别名</th>
           <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider">描述</th>
           <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider">日期</th>
           <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider text-right">操作</th>
+          <th className="px-4 py-3 text-xs font-semibold text-[var(--color-fg-muted)] uppercase tracking-wider text-right">发版</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--color-border-muted)]">
         {packages.map((pkg, index) => (
           <AnimatedTableRow key={pkg.id} index={index}>
             <td className="px-4 py-3 font-mono font-medium" style={{ color: '#6C3FF5' }}>{pkg.name}</td>
+            <td className="px-4 py-3 text-[var(--color-fg-muted)]">{pkg.alias || '-'}</td>
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{pkg.description || '-'}</td>
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatDate(pkg.created_at)}</td>
             <td className="px-4 py-3 text-right">
               <div className="flex items-center justify-end gap-2">
-                {jenkinsConfigs[pkg.id] && (
-                  <button
-                    onClick={() => onSingleRelease(pkg.id)}
-                    className="text-xs px-3 py-1 rounded-md border border-[#6C3FF5] text-[#6C3FF5] hover:bg-[rgba(108,63,245,0.1)] transition-all"
-                  >
-                    🚀 发版
-                  </button>
-                )}
+                <button
+                  onClick={() => onEditPackage(pkg)}
+                  className="text-xs px-3 py-1 rounded-md border border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[#6C3FF5] hover:text-[#6C3FF5] transition-all"
+                >
+                  ✏️ 编辑
+                </button>
                 <button
                   onClick={() => onConfigJenkins(pkg)}
                   className={`text-xs px-3 py-1 rounded-md border transition-all ${
@@ -894,7 +911,7 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
                       : 'border-[var(--color-border-default)] text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)]'
                   }`}
                 >
-                  {jenkinsConfigs[pkg.id] ? '⚙️ 已配置' : '⚙️ 配置发版'}
+                  {jenkinsConfigs[pkg.id] ? '⚙️ 已配置' : '⚙️ 配置'}
                 </button>
                 <button
                   onClick={() => onDelete(pkg.id)}
@@ -904,6 +921,18 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
                   {deleting === pkg.id ? '删除中' : '删除'}
                 </button>
               </div>
+            </td>
+            <td className="px-4 py-3 text-right">
+              {jenkinsConfigs[pkg.id] ? (
+                <button
+                  onClick={() => onSingleRelease(pkg.id)}
+                  className="text-xs px-3 py-1 rounded-md border border-[#6C3FF5] text-[#6C3FF5] hover:bg-[rgba(108,63,245,0.1)] transition-all"
+                >
+                  🚀 发版
+                </button>
+              ) : (
+                <span className="text-xs text-[var(--color-fg-muted)]">未配置</span>
+              )}
             </td>
           </AnimatedTableRow>
         ))}
@@ -1171,6 +1200,68 @@ function JenkinsConfigModal({ pkg, existingConfig, onSaved, onDeleted, onClose }
           </div>
         )
       }
+    />
+  );
+}
+
+function EditPackageModal({ pkg, onSaved, onClose }: {
+  pkg: Package;
+  onSaved: (pkg: Package) => void;
+  onClose: () => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
+
+  const handleClose = () => {
+    setOpen(false);
+    setTimeout(onClose, 200);
+  };
+
+  const handleSubmit = async (values: Record<string, string>) => {
+    setLoading(true);
+    try {
+      const updatedPkg = await updatePackage(pkg.id, {
+        name: values.name,
+        description: values.description,
+        homepage: values.homepage,
+        alias: values.alias,
+      });
+      onSaved(updatedPkg);
+      showToast('success', '软件包更新成功');
+      handleClose();
+    } catch (err: any) {
+      showToast('error', err.response?.data?.error || '更新失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fields = [
+    { id: 'name', label: '名称', type: 'text' as const, placeholder: '输入软件包名称', required: true },
+    { id: 'alias', label: '别名', type: 'text' as const, placeholder: '输入软件包别名（可选）' },
+    { id: 'description', label: '描述', type: 'text' as const, placeholder: '输入软件包描述' },
+    { id: 'homepage', label: '主页', type: 'url' as const, placeholder: 'https://...' },
+  ];
+
+  const initialValues: Record<string, string> = {
+    name: pkg.name,
+    alias: pkg.alias || '',
+    description: pkg.description || '',
+    homepage: pkg.homepage || '',
+  };
+
+  return (
+    <FormDialog
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && handleClose()}
+      title="编辑软件包"
+      description={pkg.name}
+      fields={fields}
+      defaultValues={initialValues}
+      onSubmit={handleSubmit}
+      submitText="保存"
+      loading={loading}
     />
   );
 }

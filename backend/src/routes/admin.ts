@@ -241,6 +241,32 @@ router.post('/packages', authenticateToken, requireAdmin, (req: AuthRequest, res
   }
 });
 
+// PUT /api/admin/packages/:id - Update package
+router.put('/packages/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description, homepage, alias } = req.body;
+    if (!name) return res.status(400).json({ error: '包名不能为空' });
+
+    // Check if package exists
+    const existing = getDb().prepare('SELECT * FROM packages WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: '包不存在' });
+
+    // Check if new name conflicts with another package
+    if (name !== (existing as any).name) {
+      const conflict = getDb().prepare('SELECT id FROM packages WHERE name = ? AND id != ?').get(name, req.params.id);
+      if (conflict) return res.status(409).json({ error: '包名已存在' });
+    }
+
+    getDb().prepare('UPDATE packages SET name = ?, description = ?, homepage = ?, alias = ? WHERE id = ?')
+      .run(name, description || '', homepage || '', alias || null, req.params.id);
+
+    const pkg = getDb().prepare('SELECT * FROM packages WHERE id = ?').get(req.params.id);
+    res.json(pkg);
+  } catch (err) {
+    res.status(500).json({ error: '更新包失败' });
+  }
+});
+
 // DELETE /api/admin/packages/:id - Delete package
 router.delete('/packages/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
