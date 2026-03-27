@@ -11,7 +11,7 @@ router.get('/releases', (req: Request, res: Response) => {
       SELECT r.*, p.name as package_name, p.description as package_description,
         (SELECT COUNT(*) FROM assets WHERE release_id = r.id) as asset_count,
         (SELECT SUM(download_count) FROM assets WHERE release_id = r.id) as total_downloads,
-        (SELECT GROUP_CONCAT(DISTINCT pk.name) FROM assets a JOIN packages pk ON a.package_id = pk.id WHERE a.release_id = r.id) as all_package_names
+        (SELECT GROUP_CONCAT(DISTINCT pk.name ORDER BY pk.name) FROM releases rk JOIN packages pk ON rk.package_id = pk.id WHERE rk.unified_session_id = r.unified_session_id AND rk.unified_session_id IS NOT NULL) as all_package_names
       FROM releases r
       JOIN packages p ON r.package_id = p.id
       WHERE r.is_draft = 0

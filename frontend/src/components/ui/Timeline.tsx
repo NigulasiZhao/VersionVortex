@@ -53,14 +53,17 @@ function aggregateReleases(releases) {
           ...release,
           // 聚合所有包名（去重）
           all_package_names: release.all_package_names || release.package_name,
+          // 聚合下载次数
+          total_downloads: release.total_downloads || 0,
           aggregated: true,
         });
       } else {
-        // 合并包名
+        // 合并包名和下载次数
         const existing = unifiedMap.get(release.unified_session_id);
         const existingNames = new Set((existing.all_package_names || '').split(',').filter(Boolean));
         (release.all_package_names || release.package_name).split(',').forEach((name: string) => existingNames.add(name.trim()));
         existing.all_package_names = Array.from(existingNames).join(',');
+        existing.total_downloads = (existing.total_downloads || 0) + (release.total_downloads || 0);
       }
     } else {
       // 单包发版：直接保留
