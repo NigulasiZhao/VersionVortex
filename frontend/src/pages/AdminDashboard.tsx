@@ -17,7 +17,8 @@ import {
   getJenkinsConfigs,
   saveJenkinsConfig,
   deleteJenkinsConfig,
-  triggerAllJenkinsBuilds,
+  triggerUnifiedRelease,
+  triggerSingleRelease,
   getJenkinsBuildSession,
   getJenkinsBuildActive,
   getAdminReleases as reloadReleases,
@@ -286,6 +287,10 @@ export default function AdminDashboard() {
   const pollBuildSessionRef = useRef<((sessionId: string) => void) | null>(null);
   const isRestoredRef = useRef(false);
 
+  // 统一发版包选择弹框状态
+  const [packageSelectOpen, setPackageSelectOpen] = useState(false);
+  const [selectedPackageIds, setSelectedPackageIds] = useState<number[]>([]);
+
   // 保存状态到 localStorage
   useEffect(() => {
     if (buildSession) {
@@ -435,12 +440,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // 一键发版
-  const handleOneClickRelease = async () => {
+  // 统一发版
+  const handleUnifiedRelease = async (selectedPackageIds?: number[]) => {
     setBuildError('');
     setBuildLoading(true);
     try {
-      const result = await triggerAllJenkinsBuilds();
+      const result = await triggerUnifiedRelease(selectedPackageIds);
       setBuildSession({
         id: result.session_id,
         tag_name: result.tag_name,
@@ -451,6 +456,37 @@ export default function AdminDashboard() {
       });
       // Start polling
       pollBuildSession(result.session_id);
+    } catch (err: any) {
+      setBuildError(err.response?.data?.error || err.message);
+      setBuildLoading(false);
+    }
+  };
+
+  // 单包发版
+  const handleSingleRelease = async (packageId: number) => {
+    setBuildError('');
+    setBuildLoading(true);
+    try {
+      const result = await triggerSingleRelease(packageId);
+      if (result.status === 'queued' || result.status === 'building' || result.status === 'completed') {
+        // 如果有 session_id，说明是异步的
+        if (result.session_id) {
+          setBuildSession({
+            id: result.session_id,
+            tag_name: result.tag_name,
+            created_at: new Date().toISOString(),
+            packages: [],
+            overall_status: 'running',
+            release_id: null,
+          });
+          pollBuildSession(result.session_id);
+        } else {
+          // 同步完成的
+          setBuildLoading(false);
+          showToast('success', `单包发版完成，版本 ${result.tagName}`);
+          load();
+        }
+      }
     } catch (err: any) {
       setBuildError(err.response?.data?.error || err.message);
       setBuildLoading(false);
@@ -591,7 +627,11 @@ export default function AdminDashboard() {
           {tab === 'releases' && (
             <div className="flex gap-2">
               <ReleaseButton
-                onClick={handleOneClickRelease}
+                onClick={() => {
+                  // 默认全选所有配置了 Jenkins 的包
+                  setSelectedPackageIds(Object.keys(jenkinsConfigs).map(Number));
+                  setPackageSelectOpen(true);
+                }}
                 disabled={buildLoading || buildSession?.overall_status === 'running' || Object.keys(jenkinsConfigs).length === 0}
                 loading={buildLoading || buildSession?.overall_status === 'running'}
                 label="一键发版"
@@ -630,6 +670,7 @@ export default function AdminDashboard() {
               onDelete={(id) => setDeleteConfirm({ open: true, type: 'package', id, name: '' })}
               deleting={deleting}
               onConfigJenkins={(pkg) => setJenkinsConfigModal({ open: true, pkg })}
+              onSingleRelease={(pkgId) => handleSingleRelease(pkgId)}
             />
           ) : (
             <UsersTable
@@ -672,6 +713,62 @@ export default function AdminDashboard() {
             onClose={() => setJenkinsConfigModal({ open: false, pkg: null })}
           />
         )}
+
+        {/* 统一发版包选择弹窗 */}
+        <SimpleDialog
+          open={packageSelectOpen}
+          onOpenChange={(open) => !open && setPackageSelectOpen(false)}
+          title="统一发版"
+          description="选择要发版的软件包（统一使用同一版本号）"
+        >
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {packages.filter(p => jenkinsConfigs[p.id]).map((pkg) => (
+              <label
+                key={pkg.id}
+                className="flex items-center gap-3 p-2 rounded-lg border border-[var(--color-border-default)] cursor-pointer hover:bg-[var(--color-canvas-subtle)] transition-all"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedPackageIds.includes(pkg.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedPackageIds([...selectedPackageIds, pkg.id]);
+                    } else {
+                      setSelectedPackageIds(selectedPackageIds.filter(id => id !== pkg.id));
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-[var(--color-border-default)]"
+                />
+                <span className="font-mono text-sm">{pkg.name}</span>
+                {pkg.description && (
+                  <span className="text-xs text-[var(--color-fg-muted)] truncate">{pkg.description}</span>
+                )}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => setPackageSelectOpen(false)}
+              className="flex-1 py-2 text-sm border rounded-lg transition-all"
+              style={{ borderColor: 'var(--color-border-default)', color: 'var(--color-fg-muted)' }}
+            >
+              取消
+            </button>
+            <button
+              onClick={() => {
+                if (selectedPackageIds.length > 0) {
+                  setPackageSelectOpen(false);
+                  handleUnifiedRelease(selectedPackageIds);
+                }
+              }}
+              disabled={selectedPackageIds.length === 0}
+              className="flex-1 py-2 text-sm rounded-lg transition-all disabled:opacity-50"
+              style={{ background: '#6C3FF5', color: 'white' }}
+            >
+              确认发版
+            </button>
+          </div>
+        </SimpleDialog>
       </div>
     </div>
   );
@@ -747,12 +844,13 @@ function ReleasesTable({ releases, onDelete, deleting }: {
   );
 }
 
-function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJenkins }: {
+function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJenkins, onSingleRelease }: {
   packages: Package[];
   jenkinsConfigs: Record<number, JenkinsConfig>;
   onDelete: (id: number) => void;
   deleting: number | null;
   onConfigJenkins: (pkg: Package) => void;
+  onSingleRelease: (pkgId: number) => void;
 }) {
   if (packages.length === 0) {
     return (
@@ -780,6 +878,14 @@ function PackagesTable({ packages, jenkinsConfigs, onDelete, deleting, onConfigJ
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatDate(pkg.created_at)}</td>
             <td className="px-4 py-3 text-right">
               <div className="flex items-center justify-end gap-2">
+                {jenkinsConfigs[pkg.id] && (
+                  <button
+                    onClick={() => onSingleRelease(pkg.id)}
+                    className="text-xs px-3 py-1 rounded-md border border-[#6C3FF5] text-[#6C3FF5] hover:bg-[rgba(108,63,245,0.1)] transition-all"
+                  >
+                    🚀 发版
+                  </button>
+                )}
                 <button
                   onClick={() => onConfigJenkins(pkg)}
                   className={`text-xs px-3 py-1 rounded-md border transition-all ${

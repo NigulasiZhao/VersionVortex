@@ -40,10 +40,47 @@ function formatDate(dateStr) {
   });
 }
 
-function groupByMonth(releases) {
-  const groups = {};
+// 聚合统一发版的多个 release 为一个显示条目
+function aggregateReleases(releases) {
+  const unifiedMap = new Map();
+  const result: any[] = [];
 
   releases.forEach((release) => {
+    if (release.release_type === 'unified' && release.unified_session_id) {
+      // 统一发版：按 unified_session_id 聚合
+      if (!unifiedMap.has(release.unified_session_id)) {
+        unifiedMap.set(release.unified_session_id, {
+          ...release,
+          // 聚合所有包名（去重）
+          all_package_names: release.all_package_names || release.package_name,
+          aggregated: true,
+        });
+      } else {
+        // 合并包名
+        const existing = unifiedMap.get(release.unified_session_id);
+        const existingNames = new Set((existing.all_package_names || '').split(',').filter(Boolean));
+        (release.all_package_names || release.package_name).split(',').forEach((name: string) => existingNames.add(name.trim()));
+        existing.all_package_names = Array.from(existingNames).join(',');
+      }
+    } else {
+      // 单包发版：直接保留
+      result.push(release);
+    }
+  });
+
+  // 加入所有聚合后的统一发版
+  unifiedMap.forEach((agg) => result.push(agg));
+
+  return result;
+}
+
+function groupByMonth(releases) {
+  // 先聚合统一发版的多个 release
+  const aggregated = aggregateReleases(releases);
+
+  const groups: Record<string, any[]> = {};
+
+  aggregated.forEach((release) => {
     const date = new Date(release.created_at);
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
@@ -75,6 +112,8 @@ function groupByMonth(releases) {
 function ReleaseCard({ release, isLatest }) {
   const isPrerelease = release.is_prerelease === 1;
   const isDraft = release.is_draft === 1;
+  const isUnified = release.release_type === 'unified';
+  const isSingle = release.release_type === 'single';
   const totalDownloads = release.total_downloads;
 
   // Save scroll position before navigating
@@ -86,22 +125,40 @@ function ReleaseCard({ release, isLatest }) {
     <Link
       to={`/releases/${release.tag_name}`}
       onClick={handleClick}
-      className="block border rounded-xl p-5 transition-all duration-300 hover:border-[#6C3FF5] group"
+      className={`block border rounded-xl transition-all duration-300 hover:border-[#6C3FF5] group ${
+        isUnified ? 'p-5' : 'p-4'
+      }`}
       style={{
         borderColor: "var(--color-border-default)",
-        background: "var(--color-canvas-default)",
-        borderLeft: isLatest ? "3px solid #6C3FF5" : undefined,
+        background: isUnified ? "linear-gradient(135deg, rgba(108,63,245,0.05), transparent)" : "var(--color-canvas-default)",
+        borderLeft: isUnified ? "4px solid #6C3FF5" : (isLatest ? "3px solid #6C3FF5" : undefined),
         textDecoration: "none",
       }}
     >
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span
-            className="font-mono font-semibold text-base"
+            className={`font-mono font-semibold ${isUnified ? 'text-lg' : 'text-base'}`}
             style={{ color: "#6C3FF5" }}
           >
             {release.tag_name}
           </span>
+          {isUnified && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ background: "linear-gradient(135deg, #6C3FF5, #A78BFA)", color: "white" }}
+            >
+              🎯 统一发版
+            </span>
+          )}
+          {isSingle && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full border"
+              style={{ borderColor: "var(--color-border-default)", color: "var(--color-fg-muted)" }}
+            >
+              单包发版
+            </span>
+          )}
           {isPrerelease && (
             <span
               className="text-xs px-2 py-0.5 rounded-full border"
@@ -133,8 +190,8 @@ function ReleaseCard({ release, isLatest }) {
         </h3>
       )}
 
-      <div className="flex items-center gap-3 text-xs mb-3" style={{ color: "var(--color-fg-muted)" }}>
-        <span>{release.all_package_names || release.package_name}</span>
+      <div className="flex items-center gap-3 text-xs mb-3 flex-wrap" style={{ color: "var(--color-fg-muted)" }}>
+        <span className={isUnified ? 'font-medium' : ''}>{release.all_package_names || release.package_name}</span>
         <span>·</span>
         <span>{formatDate(release.created_at)}</span>
         {totalDownloads !== undefined && totalDownloads > 0 && (

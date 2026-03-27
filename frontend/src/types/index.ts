@@ -29,6 +29,8 @@ export interface Release {
   is_prerelease: number;
   created_at: string;
   updated_at: string;
+  release_type?: 'unified' | 'single'; // unified = 统一发版, single = 单包发版
+  unified_session_id?: string | null; // 关联的构建会话 ID，仅 unified 类型使用
   asset_count?: number;
   total_downloads?: number;
   assets?: Asset[];

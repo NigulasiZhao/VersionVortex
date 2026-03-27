@@ -95,7 +95,8 @@ export const getJenkinsConfigs = () => api.get('/admin/jenkins-configs').then((r
 export const getJenkinsConfig = (packageId: number) => api.get(`/admin/jenkins-config/${packageId}`).then((r) => r.data);
 export const saveJenkinsConfig = (data: any) => api.post('/admin/jenkins-config', data).then((r) => r.data);
 export const deleteJenkinsConfig = (packageId: number) => api.delete(`/admin/jenkins-config/${packageId}`).then((r) => r.data);
-export const triggerAllJenkinsBuilds = () => api.post('/admin/jenkins-build/trigger-all').then((r) => r.data);
+export const triggerUnifiedRelease = (packageIds?: number[]) => api.post('/admin/jenkins-build/unified-release', { package_ids: packageIds }).then((r) => r.data);
+export const triggerSingleRelease = (packageId: number) => api.post('/admin/jenkins-build/single-release', { package_id: packageId }).then((r) => r.data);
 export const getJenkinsBuildSession = (sessionId: string) => api.get(`/admin/jenkins-build/session/${sessionId}`).then((r) => r.data);
 export const getJenkinsBuildActive = () => api.get('/admin/jenkins-build/active').then((r) => r.data);
 export const getJenkinsBuildHistory = () => api.get('/admin/jenkins-build/history').then((r) => r.data);

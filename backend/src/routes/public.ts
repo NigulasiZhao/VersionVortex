@@ -41,13 +41,24 @@ router.get('/releases/:tag', (req: Request, res: Response) => {
       FROM releases r
       JOIN packages p ON r.package_id = p.id
       WHERE r.tag_name = ?
-    `).get(req.params.tag);
+    `).get(req.params.tag) as any;
 
     if (!release) {
       return res.status(404).json({ error: '版本不存在' });
     }
 
-    const assets = getDb().prepare('SELECT * FROM assets WHERE release_id = ?').all((release as any).id);
+    let assets: any[];
+    if (release.release_type === 'unified' && release.unified_session_id) {
+      // 统一发版：获取同一 session 下所有包的 assets
+      assets = getDb().prepare(`
+        SELECT a.* FROM assets a
+        JOIN releases r ON a.release_id = r.id
+        WHERE r.unified_session_id = ?
+        ORDER BY r.package_id
+      `).all(release.unified_session_id);
+    } else {
+      assets = getDb().prepare('SELECT * FROM assets WHERE release_id = ?').all(release.id);
+    }
     res.json({ ...release, assets });
   } catch (err) {
     res.status(500).json({ error: '获取版本详情失败' });

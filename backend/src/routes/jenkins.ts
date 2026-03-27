@@ -105,12 +105,47 @@ function getActiveBuildSessionFromDb(): BuildSession | null {
 }
 
 // Helper: increment version number
-function incrementVersion(latestTag: string | null): string {
+// mode: 'minor' -> unified release (minor++, patch=0), 'patch' -> single release (patch++)
+function incrementVersion(latestTag: string | null, mode: 'minor' | 'patch' = 'patch'): string {
   if (!latestTag) return '1.0.0';
   const match = latestTag.match(/^v?(\d+)\.(\d+)\.(\d+)(.*)$/);
   if (!match) return '1.0.0';
   const [, major, minor, patch, suffix] = match;
+  if (mode === 'minor') {
+    return `${major}.${parseInt(minor) + 1}.0${suffix}`;
+  }
   return `${major}.${minor}.${parseInt(patch) + 1}${suffix}`;
+}
+
+// Helper: calculate unified version (highest minor among selected packages + 1, patch=0)
+function calculateUnifiedVersion(packageIds: number[]): string {
+  let highestVersion = '0.0.0';
+  for (const pkgId of packageIds) {
+    const latest = getDb().prepare(
+      'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
+    ).get(pkgId) as any;
+    if (latest?.tag_name) {
+      const v = latest.tag_name.replace(/^v/, '');
+      if (compareVersions(v, highestVersion) > 0) {
+        highestVersion = v;
+      }
+    }
+  }
+  const match = highestVersion.match(/^v?(\d+)\.(\d+)\.(\d+)(.*)$/);
+  if (!match) return '1.0.0';
+  const [, major, minor] = match;
+  return `${major}.${parseInt(minor) + 1}.0`;
+}
+
+// Compare versions: returns 1 if a > b, -1 if a < b, 0 if equal
+function compareVersions(a: string, b: string): number {
+  const aParts = a.match(/\d+/g)?.map(Number) || [0, 0, 0];
+  const bParts = b.match(/\d+/g)?.map(Number) || [0, 0, 0];
+  for (let i = 0; i < 3; i++) {
+    if (aParts[i] > bParts[i]) return 1;
+    if (aParts[i] < bParts[i]) return -1;
+  }
+  return 0;
 }
 
 // Helper: HTTP request with Basic Auth (30s timeout guarantee)
@@ -311,22 +346,29 @@ router.get('/jenkins-build/status/:jobName/:buildNumber', authenticateToken, req
   }
 });
 
-// POST /api/admin/jenkins-build/trigger-all - Trigger all packages at once
-router.post('/jenkins-build/trigger-all', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+// POST /api/admin/jenkins-build/unified-release - Unified release for selected packages
+router.post('/jenkins-build/unified-release', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const configs = getDb().prepare(`
+    // Accept optional package_ids array; if not provided, trigger all configured packages
+    const { package_ids } = req.body as { package_ids?: number[] };
+
+    let configs = getDb().prepare(`
       SELECT jc.*, p.name as package_name
       FROM jenkins_configs jc
       JOIN packages p ON jc.package_id = p.id
     `).all() as any[];
 
+    if (package_ids && package_ids.length > 0) {
+      configs = configs.filter(c => package_ids.includes(c.package_id));
+    }
+
     if (configs.length === 0) {
       return res.status(404).json({ error: '没有任何软件包配置了 Jenkins，请先在软件包中配置' });
     }
 
-    // Calculate next version number
-    const allReleases = getDb().prepare('SELECT tag_name FROM releases ORDER BY created_at DESC LIMIT 1').get() as any;
-    const tagName = incrementVersion(allReleases?.tag_name);
+    // Calculate unified version: highest minor + 1, patch = 0
+    const pkgIds = configs.map(c => c.package_id);
+    const tagName = calculateUnifiedVersion(pkgIds);
 
     // Create session
     const sessionId = uuidv4();
@@ -357,7 +399,7 @@ router.post('/jenkins-build/trigger-all', authenticateToken, requireAdmin, async
     saveBuildSessionToDb(session);
 
     // Fire off builds for all packages in parallel (async, don't await)
-    triggerPackageBuilds(sessionId, configs, tagName);
+    triggerPackageBuilds(sessionId, configs, tagName, 'unified');
 
     res.status(202).json({ session_id: sessionId, tag_name: tagName, package_count: configs.length });
   } catch (err: any) {
@@ -366,24 +408,35 @@ router.post('/jenkins-build/trigger-all', authenticateToken, requireAdmin, async
 });
 
 // Background: trigger builds for all packages
-async function triggerPackageBuilds(sessionId: string, configs: any[], tagName: string) {
+async function triggerPackageBuilds(sessionId: string, configs: any[], tagName: string, releaseType: 'unified' | 'single' = 'single') {
   const session = buildSessions.get(sessionId);
   if (!session) return;
 
   await Promise.allSettled(
-    configs.map((config, idx) => buildSinglePackage(sessionId, idx, config, tagName))
+    configs.map((config, idx) => buildSinglePackage(sessionId, idx, config, tagName, releaseType))
   );
 
   const anyFailed = session.packages.some((p) => p.status === 'failed');
   const allDone = session.packages.every((p) => p.status === 'completed');
   session.overall_status = anyFailed ? 'failed' : 'completed';
 
+  // If unified release and any package failed, rollback (mark all releases as failed)
+  if (releaseType === 'unified' && anyFailed) {
+    const db = getDb();
+    const failedPkgIds = session.packages.filter(p => p.status === 'failed').map(p => p.package_id);
+    // Mark releases from this session as draft (soft rollback)
+    db.prepare(`
+      UPDATE releases SET is_draft = 1, body = '统一发版失败，已回滚'
+      WHERE unified_session_id = ? AND package_id IN (${failedPkgIds.map(() => '?').join(',')})
+    `).run(sessionId, ...failedPkgIds);
+  }
+
   // Save final status to database
   saveBuildSessionToDb(session);
 }
 
 // Build a single package (runs in background)
-async function buildSinglePackage(sessionId: string, idx: number, config: any, tagName: string) {
+async function buildSinglePackage(sessionId: string, idx: number, config: any, tagName: string, releaseType: 'unified' | 'single' = 'single') {
   const session = buildSessions.get(sessionId);
   if (!session) return;
   const pkg = session.packages[idx];
@@ -546,15 +599,17 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
   // Create release first (use first package's release as the canonical one, or create if doesn't exist)
   // Check if a release with this tag_name already exists (from another package in the same batch)
   let release = getDb().prepare(
-    'SELECT id FROM releases WHERE tag_name = ? ORDER by id asc LIMIT 1'
-  ).get(tagName) as any;
+    'SELECT id FROM releases WHERE tag_name = ? AND package_id = ? LIMIT 1'
+  ).get(tagName, config.package_id) as any;
   let releaseId = release?.id;
 
   if (!releaseId) {
+    // For unified releases, set unified_session_id to track the session
+    const unifiedSessionId = releaseType === 'unified' ? sessionId : null;
     getDb().prepare(
-      'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(config.package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
-    release = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? ORDER by id asc LIMIT 1').get(tagName) as any;
+      'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(config.package_id, tagName, `Build #${buildNumber}`, '', 0, 0, releaseType, unifiedSessionId);
+    release = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? AND package_id = ? LIMIT 1').get(tagName, config.package_id) as any;
     releaseId = release?.id;
   }
   console.log(`[Jenkins] release created: id=${releaseId} tag=${tagName} pkg=${config.package_id}`);
@@ -634,7 +689,7 @@ router.get('/jenkins-build/history', authenticateToken, requireAdmin, (req: Auth
   const result = sessions.map(s => getBuildSessionFromDb(s.id)).filter(Boolean);
   res.json(result);
 });
-router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { package_id } = req.body;
     if (!package_id) return res.status(400).json({ error: '缺少 package_id' });
@@ -646,12 +701,12 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
     const baseUrl = config.jenkins_url.replace(/\/$/, '');
     const jobName = encodeURIComponent(config.job_name);
 
-    // Step 1: Trigger build with version parameter
+    // Step 1: Trigger build with version parameter (single release uses patch++)
     let buildNumber: number | null = null;
     const latestRelease = getDb().prepare(
       'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
     ).get(package_id) as any;
-    const tagName = incrementVersion(latestRelease?.tag_name);
+    const tagName = incrementVersion(latestRelease?.tag_name, 'patch');
 
     try {
       const { res: triggerRes } = await jenkinsRequest(
@@ -698,8 +753,8 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
     if (!buildNumber) {
       // Couldn't get build number, create a release anyway
       getDb().prepare(
-        'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(package_id, tagName, `Build triggered`, '', 0, 0);
+        'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(package_id, tagName, `Build triggered`, '', 0, 0, 'single', null);
       const release = getDb().prepare(
         'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
       ).get(package_id, tagName) as any;
@@ -762,8 +817,8 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
 
     if (matchedArtifacts.length === 0) {
       getDb().prepare(
-        'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
+        'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(package_id, tagName, `Build #${buildNumber}`, '', 0, 0, 'single', null);
       const release = getDb().prepare(
         'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
       ).get(package_id, tagName) as any;
@@ -782,8 +837,8 @@ router.post('/jenkins-build/trigger', authenticateToken, requireAdmin, async (re
 
     // Step 4: Create release
     getDb().prepare(
-      'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(package_id, tagName, `Build #${buildNumber}`, '', 0, 0);
+      'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(package_id, tagName, `Build #${buildNumber}`, '', 0, 0, 'single', null);
     const release = getDb().prepare(
       'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
     ).get(package_id, tagName) as any;

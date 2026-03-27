@@ -185,6 +185,18 @@ export async function initDb() {
     // Column may already exist, ignore
   }
 
+  // Migration: add release_type and unified_session_id to releases for unified/single release区分
+  try {
+    db.exec("ALTER TABLE releases ADD COLUMN release_type TEXT DEFAULT 'single'");
+  } catch (e: any) {
+    // Column may already exist, ignore
+  }
+  try {
+    db.exec("ALTER TABLE releases ADD COLUMN unified_session_id TEXT");
+  } catch (e: any) {
+    // Column may already exist, ignore
+  }
+
   // Seed default admin
   const adminExists = dbWrapper.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (!adminExists) {
