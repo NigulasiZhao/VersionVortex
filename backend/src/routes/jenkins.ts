@@ -72,7 +72,12 @@ function getBuildSessionFromDb(sessionId: string): BuildSession | null {
   const session = db.prepare('SELECT * FROM build_sessions WHERE id = ?').get(sessionId) as any;
   if (!session) return null;
 
-  const packages = db.prepare('SELECT * FROM build_packages WHERE session_id = ?').all(sessionId) as any[];
+  const packages = db.prepare(`
+    SELECT bp.*, COALESCE(p.alias, p.name) as display_name
+    FROM build_packages bp
+    JOIN packages p ON bp.package_id = p.id
+    WHERE bp.session_id = ?
+  `).all(sessionId) as any[];
 
   return {
     id: session.id,
@@ -82,7 +87,7 @@ function getBuildSessionFromDb(sessionId: string): BuildSession | null {
     release_id: null,
     packages: packages.map(p => ({
       package_id: p.package_id,
-      package_name: p.package_name,
+      package_name: p.display_name,
       job_name: '',
       build_number: p.build_number,
       status: p.status as any,
@@ -353,7 +358,7 @@ router.post('/jenkins-build/unified-release', authenticateToken, requireAdmin, a
     const { package_ids } = req.body as { package_ids?: number[] };
 
     let configs = getDb().prepare(`
-      SELECT jc.*, p.name as package_name
+      SELECT jc.*, p.name as package_name, COALESCE(p.alias, p.name) as display_name
       FROM jenkins_configs jc
       JOIN packages p ON jc.package_id = p.id
     `).all() as any[];
@@ -378,7 +383,7 @@ router.post('/jenkins-build/unified-release', authenticateToken, requireAdmin, a
       created_at: new Date().toISOString(),
       packages: configs.map((c) => ({
         package_id: c.package_id,
-        package_name: c.package_name,
+        package_name: c.display_name,
         job_name: c.job_name,
         build_number: null,
         status: 'pending',
@@ -694,7 +699,12 @@ router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, as
     const { package_id } = req.body;
     if (!package_id) return res.status(400).json({ error: '缺少 package_id' });
 
-    const config: any = getDb().prepare('SELECT * FROM jenkins_configs WHERE package_id = ?').get(package_id);
+    const config: any = getDb().prepare(`
+      SELECT jc.*, p.name as package_name, COALESCE(p.alias, p.name) as display_name
+      FROM jenkins_configs jc
+      JOIN packages p ON jc.package_id = p.id
+      WHERE jc.package_id = ?
+    `).get(package_id);
     if (!config) return res.status(404).json({ error: '该包未配置 Jenkins，请先配置' });
 
     const credentials = Buffer.from(`${config.username}:${config.api_token}`).toString('base64');

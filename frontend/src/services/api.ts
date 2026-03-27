@@ -80,6 +80,7 @@ export const adminLogin = (username: string, password: string) =>
 export const getAdminReleases = () => api.get('/admin/releases').then((r) => r.data);
 export const createRelease = (data: any) => api.post('/admin/releases', data).then((r) => r.data);
 export const updateRelease = (id: number, data: any) => api.put(`/admin/releases/${id}`, data).then((r) => r.data);
+export const updateUnifiedRelease = (sessionId: string, data: any) => api.put(`/admin/releases/unified/${sessionId}`, data).then((r) => r.data);
 export const deleteRelease = (id: number) => api.delete(`/admin/releases/${id}`).then((r) => r.data);
 
 export const getAdminPackages = () => api.get('/admin/packages').then((r) => r.data);

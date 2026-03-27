@@ -22,6 +22,7 @@ import {
   triggerSingleRelease,
   getJenkinsBuildSession,
   getJenkinsBuildActive,
+  updateUnifiedRelease,
   getAdminReleases as reloadReleases,
   getAdminStats as reloadStats,
 } from '../services/api';
@@ -373,6 +374,7 @@ export default function AdminDashboard() {
 
   const [jenkinsConfigModal, setJenkinsConfigModal] = useState<{ open: boolean; pkg: Package | null }>({ open: false, pkg: null });
   const [editPackageModal, setEditPackageModal] = useState<{ open: boolean; pkg: Package | null }>({ open: false, pkg: null });
+  const [unifiedReleaseModal, setUnifiedReleaseModal] = useState<{ open: boolean; sessionId: string | null; tagName: string; allPackageNames: string; initialValues: { title: string; body: string; is_draft: number; is_prerelease: number } } | null>(null);
 
   const load = () => {
     Promise.all([getAdminReleases(), getAdminPackages(), getAdminStats(), getAdminUsers(), getJenkinsConfigs()])
@@ -664,6 +666,7 @@ export default function AdminDashboard() {
               releases={releases}
               onDelete={(id) => setDeleteConfirm({ open: true, type: 'release', id, name: '' })}
               deleting={deleting}
+              onEditUnified={(sessionId, tagName, allPackageNames, initialValues) => setUnifiedReleaseModal({ open: true, sessionId, tagName, allPackageNames, initialValues })}
             />
           ) : tab === 'packages' ? (
             <PackagesTable
@@ -729,6 +732,21 @@ export default function AdminDashboard() {
           />
         )}
 
+        {/* 统一发版编辑弹窗 */}
+        {unifiedReleaseModal?.open && unifiedReleaseModal.sessionId && (
+          <UnifiedReleaseEditModal
+            modal={unifiedReleaseModal}
+            onSaved={(updatedReleases) => {
+              setReleases((prev) => prev.map((r) => {
+                const updated = updatedReleases.find((ur) => ur.id === r.id);
+                return updated || r;
+              }));
+              setUnifiedReleaseModal(null);
+            }}
+            onClose={() => setUnifiedReleaseModal(null)}
+          />
+        )}
+
         {/* 统一发版包选择弹窗 */}
         <SimpleDialog
           open={packageSelectOpen}
@@ -789,10 +807,11 @@ export default function AdminDashboard() {
   );
 }
 
-function ReleasesTable({ releases, onDelete, deleting }: {
+function ReleasesTable({ releases, onDelete, deleting, onEditUnified }: {
   releases: Release[];
   onDelete: (id: number) => void;
   deleting: number | null;
+  onEditUnified: (sessionId: string, tagName: string, allPackageNames: string, initialValues: { title: string; body: string; is_draft: number; is_prerelease: number }) => void;
 }) {
   if (releases.length === 0) {
     return (
@@ -823,6 +842,9 @@ function ReleasesTable({ releases, onDelete, deleting }: {
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{release.package_name}</td>
             <td className="px-4 py-3">
               <div className="flex gap-1.5 flex-wrap">
+                {release.release_type === 'unified' && (
+                  <span className="text-xs px-2 py-0.5 rounded-full border border-[#6C3FF5] text-[#6C3FF5]">🎯 统一发版</span>
+                )}
                 {release.is_draft === 1 && (
                   <span className="text-xs px-2 py-0.5 rounded-full border border-[var(--color-fg-muted)] text-[var(--color-fg-muted)]">草稿</span>
                 )}
@@ -837,12 +859,21 @@ function ReleasesTable({ releases, onDelete, deleting }: {
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatDate(release.created_at)}</td>
             <td className="px-4 py-3 text-right">
               <div className="flex items-center justify-end gap-2">
-                <Link
-                  to={`/admin/releases/${release.id}/edit`}
-                  className="text-xs px-3 py-1 rounded-md border text-[var(--color-fg-muted)] hover:text-[#6C3FF5] hover:border-[#6C3FF5] transition-all no-underline"
-                >
-                  编辑
-                </Link>
+                {release.release_type === 'unified' && release.unified_session_id ? (
+                  <button
+                    onClick={() => onEditUnified(release.unified_session_id, release.tag_name, release.all_package_names || '', { title: release.title, body: release.body, is_draft: release.is_draft, is_prerelease: release.is_prerelease })}
+                    className="text-xs px-3 py-1 rounded-md border border-[#6C3FF5] text-[#6C3FF5] hover:bg-[rgba(108,63,245,0.1)] transition-all"
+                  >
+                    编辑分组
+                  </button>
+                ) : (
+                  <Link
+                    to={`/admin/releases/${release.id}/edit`}
+                    className="text-xs px-3 py-1 rounded-md border text-[var(--color-fg-muted)] hover:text-[#6C3FF5] hover:border-[#6C3FF5] transition-all no-underline"
+                  >
+                    编辑
+                  </Link>
+                )}
                 <button
                   onClick={() => onDelete(release.id)}
                   disabled={deleting === release.id}
@@ -1257,6 +1288,91 @@ function EditPackageModal({ pkg, onSaved, onClose }: {
       onOpenChange={(isOpen) => !isOpen && handleClose()}
       title="编辑软件包"
       description={pkg.name}
+      fields={fields}
+      defaultValues={initialValues}
+      onSubmit={handleSubmit}
+      submitText="保存"
+      loading={loading}
+    />
+  );
+}
+
+function UnifiedReleaseEditModal({ modal, onSaved, onClose }: {
+  modal: { open: boolean; sessionId: string | null; tagName: string; allPackageNames: string; initialValues: { title: string; body: string; is_draft: number; is_prerelease: number } };
+  onSaved: (updatedReleases: Release[]) => void;
+  onClose: () => void;
+}) {
+  const [open, setOpen] = useState(modal.open);
+  const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    setOpen(modal.open);
+  }, [modal.open]);
+
+  const handleClose = () => {
+    setOpen(false);
+    setTimeout(onClose, 200);
+  };
+
+  const handleSubmit = async (values: Record<string, string>) => {
+    if (!modal.sessionId) return;
+    setLoading(true);
+    try {
+      const updatedReleases = await updateUnifiedRelease(modal.sessionId, {
+        title: values.title,
+        body: values.body,
+        is_draft: values.is_draft === 'true',
+        is_prerelease: values.is_prerelease === 'true',
+      });
+      onSaved(updatedReleases);
+      showToast('success', '统一发版更新成功');
+      handleClose();
+    } catch (err: any) {
+      showToast('error', err.response?.data?.error || '更新失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fields = [
+    { id: 'title', label: '标题', type: 'text' as const, placeholder: '版本标题', required: true },
+    { id: 'body', label: '更新日志', type: 'textarea' as const, placeholder: 'Markdown 格式的更新日志' },
+    {
+      id: 'is_draft',
+      label: '草稿',
+      type: 'select' as const,
+      defaultValue: modal.initialValues.is_draft === 1 ? 'true' : 'false',
+      options: [
+        { value: 'false', label: '否' },
+        { value: 'true', label: '是' },
+      ]
+    },
+    {
+      id: 'is_prerelease',
+      label: '预发布',
+      type: 'select' as const,
+      defaultValue: modal.initialValues.is_prerelease === 1 ? 'true' : 'false',
+      options: [
+        { value: 'false', label: '否' },
+        { value: 'true', label: '是' },
+      ]
+    },
+  ];
+
+  const initialValues: Record<string, string> = {
+    title: modal.initialValues.title || '',
+    body: modal.initialValues.body || '',
+    is_draft: modal.initialValues.is_draft === 1 ? 'true' : 'false',
+    is_prerelease: modal.initialValues.is_prerelease === 1 ? 'true' : 'false',
+  };
+
+  return (
+    <FormDialog
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && handleClose()}
+      title="编辑统一发版"
+      description={`${modal.tagName} - ${modal.allPackageNames.split(',').join(', ')}`}
       fields={fields}
       defaultValues={initialValues}
       onSubmit={handleSubmit}

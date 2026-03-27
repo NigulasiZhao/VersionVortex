@@ -84,7 +84,10 @@ router.get('/releases', authenticateToken, requireAdmin, (_req: AuthRequest, res
   try {
     const releases = getDb().prepare(`
       SELECT r.*, p.name as package_name,
-        (SELECT COUNT(*) FROM assets WHERE release_id = r.id) as asset_count
+        (SELECT COUNT(*) FROM assets WHERE release_id = r.id) as asset_count,
+        CASE WHEN r.unified_session_id IS NOT NULL THEN 'unified' ELSE 'single' END as release_type,
+        r.unified_session_id,
+        (SELECT GROUP_CONCAT(DISTINCT pk.name ORDER BY pk.name) FROM releases rk JOIN packages pk ON rk.package_id = pk.id WHERE rk.unified_session_id = r.unified_session_id AND rk.unified_session_id IS NOT NULL) as all_package_names
       FROM releases r
       JOIN packages p ON r.package_id = p.id
       ORDER BY r.created_at DESC
@@ -138,6 +141,35 @@ router.put('/releases/:id', authenticateToken, requireAdmin, (req: AuthRequest, 
     res.json(release);
   } catch (err) {
     res.status(500).json({ error: '更新版本失败' });
+  }
+});
+
+// PUT /api/admin/releases/unified/:sessionId - Update all releases in a unified session
+router.put('/releases/unified/:sessionId', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
+  try {
+    const { title, body, is_draft, is_prerelease } = req.body;
+    const sessionId = req.params.sessionId;
+
+    getDb().prepare(`
+      UPDATE releases SET title = ?, body = ?, is_draft = ?, is_prerelease = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE unified_session_id = ?
+    `).run(title, body, is_draft ? 1 : 0, is_prerelease ? 1 : 0, sessionId);
+
+    const releases = getDb().prepare(`
+      SELECT r.*, p.name as package_name,
+        CASE WHEN r.unified_session_id IS NOT NULL THEN 'unified' ELSE 'single' END as release_type,
+        r.unified_session_id,
+        (SELECT GROUP_CONCAT(DISTINCT pk.name ORDER BY pk.name) FROM releases rk JOIN packages pk ON rk.package_id = pk.id WHERE rk.unified_session_id = r.unified_session_id AND rk.unified_session_id IS NOT NULL) as all_package_names
+      FROM releases r
+      JOIN packages p ON r.package_id = p.id
+      WHERE r.unified_session_id = ?
+      ORDER BY r.created_at DESC
+    `).all(sessionId);
+
+    res.json(releases);
+  } catch (err) {
+    console.error('Update unified release error:', err);
+    res.status(500).json({ error: '更新统一发版失败' });
   }
 });
 

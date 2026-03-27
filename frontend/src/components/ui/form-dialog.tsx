@@ -18,7 +18,7 @@ import {
 export interface FormField {
   id: string
   label: string
-  type: "text" | "password" | "email" | "number" | "url" | "select"
+  type: "text" | "password" | "email" | "number" | "url" | "select" | "textarea"
   placeholder?: string
   required?: boolean
   options?: { value: string; label: string }[]
@@ -134,6 +134,24 @@ export function FormDialog({
                     </option>
                   ))}
                 </select>
+              ) : field.type === "textarea" ? (
+                <textarea
+                  id={`${field.id}-${id}`}
+                  placeholder={field.placeholder}
+                  value={values[field.id]}
+                  onChange={(e) => handleChange(field.id, e.target.value)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  required={field.required}
+                  rows={4}
+                  className={cn(
+                    "flex w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors resize-y",
+                    "bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  )}
+                  style={{
+                    borderColor: "var(--color-border-default)",
+                    color: "var(--color-fg-default)",
+                  }}
+                />
               ) : (
                 <input
                   id={`${field.id}-${id}`}
