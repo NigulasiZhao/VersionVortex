@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { getRelease, downloadAsset } from '../services/api';
-import type { Release } from '../types';
+import { getRelease, downloadAsset, getPackages } from '../services/api';
+import type { Release, Package } from '../types';
 import { ArrowLeft, Download, ExternalLink } from 'lucide-react';
 
 function formatBytes(bytes: number) {
@@ -52,17 +52,32 @@ export default function ReleaseDetail() {
   const { tag } = useParams();
   const location = useLocation();
   const [release, setRelease] = useState<Release | null>(null);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState<number | null>(null);
 
   useEffect(() => {
     if (!tag) return;
-    getRelease(tag)
-      .then(setRelease)
+    Promise.all([getRelease(tag), getPackages()])
+      .then(([r, p]) => {
+        setRelease(r);
+        setPackages(p);
+      })
       .catch(() => setError('版本不存在'))
       .finally(() => setLoading(false));
   }, [tag]);
+
+  // Get package alias map
+  const packageAliasMap = {};
+  packages.forEach((pkg) => {
+    packageAliasMap[pkg.name] = pkg.alias || pkg.name;
+  });
+
+  // Get display name for a package
+  const getDisplayName = (pkgName) => {
+    return packageAliasMap[pkgName] || pkgName;
+  };
 
   const handleDownload = (assetId: number) => {
     setDownloading(assetId);
@@ -125,7 +140,7 @@ export default function ReleaseDetail() {
             <h2 className="text-lg text-[var(--color-fg-muted)] font-normal mb-3">{release.title}</h2>
           )}
           <div className="flex items-center gap-3 text-sm text-[var(--color-fg-muted)]">
-            <span>{release.package_name}</span>
+            <span>{getDisplayName(release.package_name)}</span>
             <span>·</span>
             <span>{formatDate(release.created_at)}</span>
             {release.homepage && (
@@ -175,34 +190,40 @@ export default function ReleaseDetail() {
                     暂无下载文件
                   </div>
                 ) : (
-                  release.assets.map((asset) => (
-                    <div key={asset.id} className="px-4 py-3 flex items-center gap-3 hover:bg-[var(--color-canvas-subtle)] transition-colors">
-                      <span className="text-xl shrink-0">{getFileIcon(asset.name)}</span>
-                      <div className="flex-1 min-w-0">
+                  release.assets.map((asset) => {
+                    // Replace package name with alias in the asset name
+                    const pkgName = asset.package_name || '';
+                    const pkgAlias = asset.package_alias || pkgName;
+                    const displayName = pkgName ? asset.name.replace(pkgName, pkgAlias) : asset.name;
+                    return (
+                      <div key={asset.id} className="px-4 py-3 flex items-center gap-3 hover:bg-[var(--color-canvas-subtle)] transition-colors">
+                        <span className="text-xl shrink-0">{getFileIcon(asset.name)}</span>
+                        <div className="flex-1 min-w-0">
+                          <button
+                            onClick={() => handleDownload(asset.id)}
+                            className="text-sm text-[#6C3FF5] hover:underline text-left font-medium block w-full truncate transition-colors"
+                          >
+                            {displayName}
+                          </button>
+                          <div className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">
+                            <span>{formatBytes(asset.size)}</span>
+                            <span>·</span>
+                            <span>{Number(asset.download_count).toLocaleString()} 次下载</span>
+                          </div>
+                        </div>
                         <button
                           onClick={() => handleDownload(asset.id)}
-                          className="text-sm text-[#6C3FF5] hover:underline text-left font-medium block w-full truncate transition-colors"
+                          disabled={downloading === asset.id}
+                          className="shrink-0 text-xs px-3 py-1.5 rounded-lg text-white transition-all"
+                          style={{ background: downloading === asset.id ? '#A78BFA' : '#6C3FF5' }}
+                          onMouseEnter={(e) => { if (downloading !== asset.id) e.currentTarget.style.background = '#5B35E0'; }}
+                          onMouseLeave={(e) => { if (downloading !== asset.id) e.currentTarget.style.background = '#6C3FF5'; }}
                         >
-                          {asset.name}
+                          {downloading === asset.id ? '下载中' : '下载'}
                         </button>
-                        <div className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">
-                          <span>{formatBytes(asset.size)}</span>
-                          <span>·</span>
-                          <span>{Number(asset.download_count).toLocaleString()} 次下载</span>
-                        </div>
                       </div>
-                      <button
-                        onClick={() => handleDownload(asset.id)}
-                        disabled={downloading === asset.id}
-                        className="shrink-0 text-xs px-3 py-1.5 rounded-lg text-white transition-all"
-                        style={{ background: downloading === asset.id ? '#A78BFA' : '#6C3FF5' }}
-                        onMouseEnter={(e) => { if (downloading !== asset.id) e.currentTarget.style.background = '#5B35E0'; }}
-                        onMouseLeave={(e) => { if (downloading !== asset.id) e.currentTarget.style.background = '#6C3FF5'; }}
-                      >
-                        {downloading === asset.id ? '下载中' : '下载'}
-                      </button>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

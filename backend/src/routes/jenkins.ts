@@ -707,6 +707,7 @@ router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, as
       'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
     ).get(package_id) as any;
     const tagName = incrementVersion(latestRelease?.tag_name, 'patch');
+    const triggerTime = Date.now();
 
     try {
       const { res: triggerRes } = await jenkinsRequest(
@@ -736,15 +737,27 @@ router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, as
         }
       }
 
-      // Fallback: try to get build number from job API
+      // Fallback: poll lastBuild but only accept builds triggered AFTER our trigger time
       if (!buildNumber) {
-        try {
-          const { body: jobBody } = await jenkinsRequest(`${baseUrl}/job/${jobName}/api/json?tree=lastBuild[number,result]`, {}, credentials);
-          const jobData = JSON.parse(jobBody || '{}');
-          if (jobData.lastBuild && jobData.lastBuild.result !== null) {
-            buildNumber = jobData.lastBuild.number;
-          }
-        } catch { /* ignore */ }
+        let attempts = 0;
+        while (attempts < 300) {
+          await new Promise(r => setTimeout(r, 2000));
+          try {
+            const { body: jobBody } = await jenkinsRequest(
+              `${baseUrl}/job/${jobName}/api/json?tree=lastBuild[number,result,building,timestamp]`,
+              {}, credentials
+            );
+            const jobData = JSON.parse(jobBody || '{}');
+            const lastBuild = jobData.lastBuild;
+            // Only accept this build if: not building, completed (result !== null), AND timestamp >= our trigger time
+            if (lastBuild && !lastBuild.building && lastBuild.result !== null && lastBuild.timestamp >= triggerTime) {
+              buildNumber = lastBuild.number;
+              console.log(`[Jenkins] fallback found new build: ${buildNumber} triggered after ${new Date(triggerTime).toISOString()}`);
+              break;
+            }
+          } catch { /* ignore */ }
+          attempts++;
+        }
       }
     } catch (err: any) {
       return res.status(502).json({ error: '触发 Jenkins 构建失败: ' + err.message });

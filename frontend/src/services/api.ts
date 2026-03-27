@@ -47,9 +47,16 @@ export const downloadAsset = async (id: number) => {
     const contentDisposition = response.headers.get('Content-Disposition');
     let filename = '';
     if (contentDisposition) {
-      const match = contentDisposition.match(/filename\*?=['"]?([^;\n"']+)/i);
-      if (match) {
-        filename = decodeURIComponent(match[1]);
+      // Try filename*=UTF-8''value (RFC 5987 format) first
+      const rfc5987Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+      if (rfc5987Match) {
+        filename = decodeURIComponent(rfc5987Match[1]);
+      } else {
+        // Fall back to traditional filename="..." or filename=...
+        const traditionalMatch = contentDisposition.match(/filename=["']?([^;"']+)/i);
+        if (traditionalMatch) {
+          filename = traditionalMatch[1];
+        }
       }
     }
 

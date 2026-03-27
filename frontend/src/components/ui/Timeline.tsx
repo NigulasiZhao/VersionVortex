@@ -109,12 +109,23 @@ function groupByMonth(releases) {
   });
 }
 
-function ReleaseCard({ release, isLatest }) {
+function ReleaseCard({ release, isLatest, packageAliasMap }) {
   const isPrerelease = release.is_prerelease === 1;
   const isDraft = release.is_draft === 1;
   const isUnified = release.release_type === 'unified';
   const isSingle = release.release_type === 'single';
   const totalDownloads = release.total_downloads;
+
+  // Get display name for a package (alias if available, otherwise name)
+  const getDisplayName = (pkgName) => {
+    return packageAliasMap?.[pkgName] || pkgName;
+  };
+
+  // Get display names for all packages in a release
+  const getDisplayNames = () => {
+    const names = (release.all_package_names || release.package_name).split(',').filter(Boolean);
+    return names.map(n => getDisplayName(n.trim())).join(', ');
+  };
 
   // Save scroll position before navigating
   const handleClick = () => {
@@ -194,7 +205,7 @@ function ReleaseCard({ release, isLatest }) {
       )}
 
       <div className="flex items-center gap-3 text-xs mb-3 flex-wrap" style={{ color: "var(--color-fg-muted)" }}>
-        <span className={isUnified ? 'font-medium' : ''}>{release.all_package_names || release.package_name}</span>
+        <span className={isUnified ? 'font-medium' : ''}>{getDisplayNames()}</span>
         <span>·</span>
         <span>{formatDate(release.created_at)}</span>
         {totalDownloads !== undefined && totalDownloads > 0 && (
@@ -226,6 +237,15 @@ function ReleaseCard({ release, isLatest }) {
 }
 
 export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage }) {
+  // Create a map from package name to alias for quick lookup
+  const packageAliasMap = {};
+  packages.forEach((pkg) => {
+    packageAliasMap[pkg.name] = pkg.alias || pkg.name;
+  });
+
+  // Get display name for dropdown options (show alias if available)
+  const getPackageLabel = (pkg) => pkg.alias || pkg.name;
+
   const filteredReleases =
     selectedPackage === "all"
       ? releases
@@ -238,10 +258,10 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
 
   const monthGroups = groupByMonth(filteredReleases);
 
-  // Prepare dropdown options
+  // Prepare dropdown options (show alias in dropdown if available)
   const dropdownOptions = [
     { id: "all", label: "全部软件包" },
-    ...packages.map((pkg) => ({ id: pkg.name, label: pkg.name })),
+    ...packages.map((pkg) => ({ id: pkg.name, label: getPackageLabel(pkg) })),
   ];
 
   return (
@@ -314,7 +334,7 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
 
                 <div className="space-y-4 pl-0 md:pl-6">
                   {group.releases.map((release) => (
-                    <ReleaseCard key={release.id} release={release} isLatest={groupIndex === 0} />
+                    <ReleaseCard key={release.id} release={release} isLatest={groupIndex === 0} packageAliasMap={packageAliasMap} />
                   ))}
                 </div>
               </div>

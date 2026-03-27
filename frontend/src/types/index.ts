@@ -46,6 +46,8 @@ export interface Asset {
   download_count: number;
   file_path: string;
   created_at: string;
+  package_name?: string;
+  package_alias?: string;
 }
 
 export interface AdminStats {

@@ -49,15 +49,23 @@ router.get('/releases/:tag', (req: Request, res: Response) => {
 
     let assets: any[];
     if (release.release_type === 'unified' && release.unified_session_id) {
-      // 统一发版：获取同一 session 下所有包的 assets
+      // 统一发版：获取同一 session 下所有包的 assets，包含包名
       assets = getDb().prepare(`
-        SELECT a.* FROM assets a
+        SELECT a.*, p.name as package_name, p.alias as package_alias
+        FROM assets a
         JOIN releases r ON a.release_id = r.id
+        JOIN packages p ON r.package_id = p.id
         WHERE r.unified_session_id = ?
         ORDER BY r.package_id
       `).all(release.unified_session_id);
     } else {
-      assets = getDb().prepare('SELECT * FROM assets WHERE release_id = ?').all(release.id);
+      assets = getDb().prepare(`
+        SELECT a.*, p.name as package_name, p.alias as package_alias
+        FROM assets a
+        JOIN releases r ON a.release_id = r.id
+        JOIN packages p ON r.package_id = p.id
+        WHERE a.release_id = ?
+      `).all(release.id);
     }
     res.json({ ...release, assets });
   } catch (err) {
@@ -107,22 +115,48 @@ router.get('/packages/:name/releases', (req: Request, res: Response) => {
 // GET /api/assets/:id/download - Download asset
 router.get('/assets/:id/download', (req: Request, res: Response) => {
   try {
-    const asset = getDb().prepare('SELECT * FROM assets WHERE id = ?').get(req.params.id) as any;
+    // Get asset with package info for alias replacement
+    const asset = getDb().prepare(`
+      SELECT a.*, p.name as package_name, p.alias as package_alias
+      FROM assets a
+      JOIN releases r ON a.release_id = r.id
+      JOIN packages p ON r.package_id = p.id
+      WHERE a.id = ?
+    `).get(req.params.id) as any;
+
     if (!asset) {
       return res.status(404).json({ error: '文件不存在' });
     }
 
     getDb().prepare('UPDATE assets SET download_count = download_count + 1 WHERE id = ?').run(asset.id);
 
+    // Replace package name with alias in filename for download
+    const pkgName = asset.package_name || '';
+    const pkgAlias = asset.package_alias || pkgName;
+    const downloadName = pkgName ? asset.name.replace(pkgName, pkgAlias) : asset.name;
+
+    // Use RFC 5987 encoding for proper filename support (ASCII-only filename*= format)
+    const encodedFilename = encodeURIComponent(downloadName);
+
     if (asset.file_path.startsWith('sample/')) {
       res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(asset.name)}"; filename*=UTF-8''${encodeURIComponent(asset.name)}`);
-      res.send(`Demo file: ${asset.name}\nThis is a sample file for demonstration purposes.`);
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+      const demoContent = `Demo file: ${downloadName}\nThis is a sample file for demonstration purposes.`;
+      res.send(demoContent);
       return;
     }
 
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(asset.name)}"; filename*=UTF-8''${encodeURIComponent(asset.name)}`);
-    res.download(asset.file_path, asset.name);
+    // Use fs.createReadStream with manual Content-Disposition
+    const fs = require('fs');
+    const path = require('path');
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Transfer-Encoding', 'binary');
+    // Use both traditional filename= (for compatibility) and RFC 5987 filename*= (for unicode)
+    const asciiFilename = downloadName.replace(/[^\x00-\x7F]/g, '_');
+    res.setHeader('Content-Disposition', `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`);
+    res.setHeader('Content-Length', fs.statSync(asset.file_path).size);
+    const fileStream = fs.createReadStream(asset.file_path);
+    fileStream.pipe(res);
   } catch (err) {
     res.status(500).json({ error: '下载失败' });
   }
