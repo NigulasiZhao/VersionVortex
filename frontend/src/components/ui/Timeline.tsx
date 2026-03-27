@@ -129,24 +129,27 @@ function ReleaseCard({ release, isLatest }) {
         isUnified ? 'p-5' : 'p-4'
       }`}
       style={{
-        borderColor: "var(--color-border-default)",
-        background: isUnified ? "linear-gradient(135deg, rgba(108,63,245,0.05), transparent)" : "var(--color-canvas-default)",
+        borderColor: isUnified ? "#6C3FF5" : "var(--color-border-default)",
+        background: isUnified
+          ? "linear-gradient(135deg, rgba(108,63,245,0.08) 0%, rgba(167,139,250,0.04) 50%, var(--color-canvas-default) 100%)"
+          : "var(--color-canvas-default)",
         borderLeft: isUnified ? "4px solid #6C3FF5" : (isLatest ? "3px solid #6C3FF5" : undefined),
+        boxShadow: isUnified ? "0 2px 12px rgba(108,63,245,0.12)" : undefined,
         textDecoration: "none",
       }}
     >
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span
-            className={`font-mono font-semibold ${isUnified ? 'text-lg' : 'text-base'}`}
+            className={`font-mono font-bold ${isUnified ? 'text-xl' : 'text-base'}`}
             style={{ color: "#6C3FF5" }}
           >
             {release.tag_name}
           </span>
           {isUnified && (
             <span
-              className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ background: "linear-gradient(135deg, #6C3FF5, #A78BFA)", color: "white" }}
+              className="text-xs px-2.5 py-1 rounded-full font-bold"
+              style={{ background: "linear-gradient(135deg, #6C3FF5, #8B5CF6)", color: "white" }}
             >
               🎯 统一发版
             </span>
@@ -211,7 +214,7 @@ function ReleaseCard({ release, isLatest }) {
 
       <div className="h-0.5 w-full mt-4 rounded-full overflow-hidden" style={{ background: "var(--color-canvas-subtle)" }}>
         <div
-          className="h-full scale-x-0 group-hover:scale-x-100 transition-transform duration-500 rounded-full"
+          className="h-full rounded-full transition-transform duration-500 scale-x-0 group-hover:scale-x-100"
           style={{
             background: "linear-gradient(90deg, #6C3FF5, #A78BFA)",
             transformOrigin: "left",

@@ -42,10 +42,21 @@ export const downloadAsset = async (id: number) => {
     });
     if (!response.ok) throw new Error('Download failed');
     const blob = await response.blob();
+
+    // 从 Content-Disposition 头提取文件名
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = '';
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename\*?=['"]?([^;\n"']+)/i);
+      if (match) {
+        filename = decodeURIComponent(match[1]);
+      }
+    }
+
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = '';
+    link.download = filename || 'download';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
