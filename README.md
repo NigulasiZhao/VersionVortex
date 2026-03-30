@@ -27,7 +27,7 @@ VersionVortex/
 │   └── src/
 │       ├── pages/           # 页面组件
 │       ├── components/      # 通用组件
-│       │   └── ui/         # UI 组件（Dialog, FormDialog, FluidDropdown 等）
+│       │   └── ui/         # UI 组件（Dialog, FormDialog, FluidDropdown, TreeView 等）
 │       ├── services/        # API 服务
 │       ├── types/           # TypeScript 类型
 │       └── lib/             # 工具函数
@@ -164,6 +164,8 @@ npm run dev
 ### 前台页面
 - 版本列表展示（支持按包名筛选，带动画下拉选择）
 - 版本详情页（变更日志、文件下载、下载次数统计）
+- **多选批量下载**：支持复选框选择多个文件，点击"下载已选"一键下载
+- **树形分组显示**：下载列表按软件包分组展示，可展开/折叠
 - 数据统计（版本数、软件包数、总下载次数）
 - 页面切换动画、滚动位置恢复
 

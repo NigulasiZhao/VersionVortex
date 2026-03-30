@@ -1,13 +1,14 @@
 export interface Package {
   id: number;
+  releases_id: number;  // 外键关联到 releases
   name: string;
-  description: string;
-  homepage: string;
+  version: string;
+  description?: string;
+  homepage?: string;
   alias?: string | null;
+  download_count: number;
   created_at: string;
-  release_count?: number;
-  latest_tag?: string;
-  latest_release_date?: string;
+  assets?: Asset[];  // 一对多
 }
 
 export interface User {
@@ -19,28 +20,25 @@ export interface User {
 
 export interface Release {
   id: number;
-  package_id: number;
-  package_name: string;
-  package_description?: string;
-  homepage?: string;
   tag_name: string;
   title: string;
   body: string;
   is_draft: number;
   is_prerelease: number;
+  release_type: 'unified' | 'single'; // unified = 统一发版, single = 单包发版
+  unified_session_id: string | null; // 关联的构建会话 ID，仅 unified 类型使用
   created_at: string;
   updated_at: string;
-  release_type?: 'unified' | 'single'; // unified = 统一发版, single = 单包发版
-  unified_session_id?: string | null; // 关联的构建会话 ID，仅 unified 类型使用
+  packages?: Package[];  // 一对多
   asset_count?: number;
   total_downloads?: number;
-  assets?: Asset[];
+  assets?: Asset[];  // 兼容旧结构
   all_package_names?: string; // comma-separated list of all packages that contributed assets to this release
 }
 
 export interface Asset {
   id: number;
-  release_id: number;
+  package_id: number;  // 外键关联到 packages
   name: string;
   size: number;
   download_count: number;

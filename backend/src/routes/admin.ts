@@ -83,13 +83,10 @@ router.post('/change-password', authenticateToken, requireAdmin, (req: AuthReque
 router.get('/releases', authenticateToken, requireAdmin, (_req: AuthRequest, res: Response) => {
   try {
     const releases = getDb().prepare(`
-      SELECT r.*, p.name as package_name,
-        (SELECT COUNT(*) FROM assets WHERE release_id = r.id) as asset_count,
-        CASE WHEN r.unified_session_id IS NOT NULL THEN 'unified' ELSE 'single' END as release_type,
-        r.unified_session_id,
-        (SELECT GROUP_CONCAT(DISTINCT pk.name ORDER BY pk.name) FROM releases rk JOIN packages pk ON rk.package_id = pk.id WHERE rk.unified_session_id = r.unified_session_id AND rk.unified_session_id IS NOT NULL) as all_package_names
+      SELECT r.*,
+        (SELECT COUNT(DISTINCT p.id) FROM packages p WHERE p.id IN (SELECT DISTINCT a.package_id FROM assets a WHERE a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%')) as package_count,
+        (SELECT GROUP_CONCAT(DISTINCT COALESCE(pk.alias, pk.name) ORDER BY pk.name) FROM packages pk WHERE pk.id IN (SELECT DISTINCT a.package_id FROM assets a WHERE a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%')) as all_package_names
       FROM releases r
-      JOIN packages p ON r.package_id = p.id
       ORDER BY r.created_at DESC
     `).all();
     res.json(releases);
@@ -101,16 +98,16 @@ router.get('/releases', authenticateToken, requireAdmin, (_req: AuthRequest, res
 // POST /api/admin/releases - Create release
 router.post('/releases', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
-    const { package_id, tag_name, title, body, is_draft, is_prerelease } = req.body;
-    if (!package_id || !tag_name) {
-      return res.status(400).json({ error: '包 ID 和版本号不能为空' });
+    const { tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id } = req.body;
+    if (!tag_name) {
+      return res.status(400).json({ error: '版本号不能为空' });
     }
 
     try {
       const result = getDb().prepare(`
-        INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(package_id, tag_name, title || '', body || '', is_draft ? 1 : 0, is_prerelease ? 1 : 0);
+        INSERT INTO releases (tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(tag_name, title || '', body || '', is_draft ? 1 : 0, is_prerelease ? 1 : 0, release_type || 'single', unified_session_id || null);
 
       const releaseId = Number(result.lastInsertRowid);
       const release = getDb().prepare('SELECT * FROM releases WHERE id = ?').get(releaseId);
@@ -159,9 +156,9 @@ router.put('/releases/unified/:sessionId', authenticateToken, requireAdmin, (req
       SELECT r.*, p.name as package_name,
         CASE WHEN r.unified_session_id IS NOT NULL THEN 'unified' ELSE 'single' END as release_type,
         r.unified_session_id,
-        (SELECT GROUP_CONCAT(DISTINCT pk.name ORDER BY pk.name) FROM releases rk JOIN packages pk ON rk.package_id = pk.id WHERE rk.unified_session_id = r.unified_session_id AND rk.unified_session_id IS NOT NULL) as all_package_names
+        (SELECT GROUP_CONCAT(DISTINCT COALESCE(pk.alias, pk.name) ORDER BY pk.name) FROM packages pk WHERE pk.releases_id = r.id) as all_package_names
       FROM releases r
-      JOIN packages p ON r.package_id = p.id
+      LEFT JOIN packages p ON p.releases_id = r.id
       WHERE r.unified_session_id = ?
       ORDER BY r.created_at DESC
     `).all(sessionId);
@@ -176,15 +173,30 @@ router.put('/releases/unified/:sessionId', authenticateToken, requireAdmin, (req
 // DELETE /api/admin/releases/:id - Delete release
 router.delete('/releases/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
-    const assets = getDb().prepare('SELECT file_path FROM assets WHERE release_id = ?').all(req.params.id) as any[];
     const fs = require('fs');
 
-    for (const asset of assets) {
-      if (!asset.file_path.startsWith('sample/') && fs.existsSync(asset.file_path)) {
-        fs.unlinkSync(asset.file_path);
+    // Find packages for this release
+    const packages = getDb().prepare('SELECT id FROM packages WHERE releases_id = ?').all(req.params.id) as any[];
+    const packageIds = packages.map(p => p.id);
+
+    // Delete assets for those packages
+    if (packageIds.length > 0) {
+      const placeholders = packageIds.map(() => '?').join(',');
+      const assets = getDb().prepare(`SELECT file_path FROM assets WHERE package_id IN (${placeholders})`).all(...packageIds) as any[];
+
+      for (const asset of assets) {
+        if (!asset.file_path.startsWith('sample/') && fs.existsSync(asset.file_path)) {
+          fs.unlinkSync(asset.file_path);
+        }
       }
+
+      getDb().prepare(`DELETE FROM assets WHERE package_id IN (${placeholders})`).run(...packageIds);
     }
 
+    // Delete packages
+    getDb().prepare('DELETE FROM packages WHERE releases_id = ?').run(req.params.id);
+
+    // Delete release
     getDb().prepare('DELETE FROM releases WHERE id = ?').run(req.params.id);
     res.json({ message: '删除成功' });
   } catch (err) {
@@ -204,13 +216,23 @@ router.post('/releases/:id/assets', authenticateToken, requireAdmin, upload.sing
       return res.status(404).json({ error: '版本不存在' });
     }
 
+    // Find package_id - from request body or find first package for this release
+    let packageId = req.body.package_id;
+    if (!packageId) {
+      const pkg = getDb().prepare('SELECT id FROM packages WHERE releases_id = ? LIMIT 1').get(req.params.id) as any;
+      if (!pkg) {
+        return res.status(400).json({ error: '该版本没有关联的包，请先创建包' });
+      }
+      packageId = pkg.id;
+    }
+
     const originalName = fixFilename(req.file!.originalname);
     getDb().prepare(`
-      INSERT INTO assets (release_id, name, size, file_path)
+      INSERT INTO assets (package_id, name, size, file_path)
       VALUES (?, ?, ?, ?)
-    `).run(req.params.id, originalName, req.file!.size, req.file!.path);
+    `).run(packageId, originalName, req.file!.size, req.file!.path);
 
-    const inserted = getDb().prepare('SELECT * FROM assets WHERE release_id = ? AND name = ? AND size = ?').get(req.params.id, originalName, req.file!.size) as any;
+    const inserted = getDb().prepare('SELECT * FROM assets WHERE package_id = ? AND name = ? AND size = ?').get(packageId, originalName, req.file!.size) as any;
     if (!inserted) return res.status(500).json({ error: '上传文件失败' });
     res.status(201).json(inserted);
   } catch (err) {
@@ -302,6 +324,18 @@ router.put('/packages/:id', authenticateToken, requireAdmin, (req: AuthRequest, 
 // DELETE /api/admin/packages/:id - Delete package
 router.delete('/packages/:id', authenticateToken, requireAdmin, (req: AuthRequest, res: Response) => {
   try {
+    const fs = require('fs');
+
+    // Find and delete assets for this package
+    const assets = getDb().prepare('SELECT file_path FROM assets WHERE package_id = ?').all(req.params.id) as any[];
+
+    for (const asset of assets) {
+      if (!asset.file_path.startsWith('sample/') && fs.existsSync(asset.file_path)) {
+        fs.unlinkSync(asset.file_path);
+      }
+    }
+
+    getDb().prepare('DELETE FROM assets WHERE package_id = ?').run(req.params.id);
     getDb().prepare('DELETE FROM packages WHERE id = ?').run(req.params.id);
     res.json({ message: '删除成功' });
   } catch (err) {
@@ -314,11 +348,10 @@ router.get('/stats', authenticateToken, requireAdmin, (_req: AuthRequest, res: R
   try {
     const stats = {
       totalReleases: (getDb().prepare('SELECT COUNT(*) as count FROM releases').get() as any).count,
-      draftReleases: (getDb().prepare('SELECT COUNT(*) as count FROM releases WHERE is_draft = 1').get() as any).count,
       totalPackages: (getDb().prepare('SELECT COUNT(*) as count FROM packages').get() as any).count,
       totalDownloads: (getDb().prepare('SELECT COALESCE(SUM(download_count), 0) as total FROM assets').get() as any).total,
       totalAssets: (getDb().prepare('SELECT COUNT(*) as count FROM assets').get() as any).count,
-      recentReleases: getDb().prepare('SELECT r.*, p.name as package_name FROM releases r JOIN packages p ON r.package_id = p.id ORDER BY r.created_at DESC LIMIT 5').all(),
+      recentReleases: getDb().prepare('SELECT * FROM releases ORDER BY created_at DESC LIMIT 5').all(),
     };
     res.json(stats);
   } catch (err) {

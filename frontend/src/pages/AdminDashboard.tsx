@@ -615,7 +615,7 @@ export default function AdminDashboard() {
               { label: '版本总数', value: stats.totalReleases, color: '#6C3FF5' },
               { label: '软件包', value: stats.totalPackages, color: '#1a7f37' },
               { label: '下载次数', value: Number(stats.totalDownloads).toLocaleString(), color: '#6C3FF5' },
-              { label: '草稿版本', value: stats.draftReleases, color: '#57606a' },
+              { label: '产物总数', value: stats.totalAssets, color: '#57606a' },
             ].map((stat) => (
               <div key={stat.label} className="border border-[var(--color-border-default)] rounded-xl p-4" style={{ background: 'var(--color-canvas-subtle)' }}>
                 <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
@@ -640,6 +640,7 @@ export default function AdminDashboard() {
                 loading={buildLoading || buildSession?.overall_status === 'running'}
                 label="一键发版"
               />
+              {/*
               <Link
                 to="/admin/releases/new"
                 className="text-xs px-4 py-2 rounded-lg text-white transition-all no-underline animate-fade-in"
@@ -649,6 +650,7 @@ export default function AdminDashboard() {
               >
                 + 新建版本
               </Link>
+              */}
             </div>
           )}
           {tab === 'packages' && (
@@ -839,11 +841,14 @@ function ReleasesTable({ releases, onDelete, deleting, onEditUnified }: {
               <div className="font-mono font-medium" style={{ color: '#6C3FF5' }}>{release.tag_name}</div>
               {release.title && <div className="text-xs text-[var(--color-fg-muted)] mt-0.5 truncate max-w-[200px]">{release.title}</div>}
             </td>
-            <td className="px-4 py-3 text-[var(--color-fg-muted)]">{release.package_name}</td>
+            <td className="px-4 py-3 text-[var(--color-fg-muted)]">{release.all_package_names}</td>
             <td className="px-4 py-3">
               <div className="flex gap-1.5 flex-wrap">
                 {release.release_type === 'unified' && (
                   <span className="text-xs px-2 py-0.5 rounded-full border border-[#6C3FF5] text-[#6C3FF5]">🎯 统一发版</span>
+                )}
+                {release.release_type === 'single' && (
+                  <span className="text-xs px-2 py-0.5 rounded-full border border-[var(--color-success-fg)] text-[var(--color-success-fg)]">📦 单包发版</span>
                 )}
                 {release.is_draft === 1 && (
                   <span className="text-xs px-2 py-0.5 rounded-full border border-[var(--color-fg-muted)] text-[var(--color-fg-muted)]">草稿</span>
@@ -859,21 +864,12 @@ function ReleasesTable({ releases, onDelete, deleting, onEditUnified }: {
             <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatDate(release.created_at)}</td>
             <td className="px-4 py-3 text-right">
               <div className="flex items-center justify-end gap-2">
-                {release.release_type === 'unified' && release.unified_session_id ? (
-                  <button
-                    onClick={() => onEditUnified(release.unified_session_id, release.tag_name, release.all_package_names || '', { title: release.title, body: release.body, is_draft: release.is_draft, is_prerelease: release.is_prerelease })}
-                    className="text-xs px-3 py-1 rounded-md border border-[#6C3FF5] text-[#6C3FF5] hover:bg-[rgba(108,63,245,0.1)] transition-all"
-                  >
-                    编辑分组
-                  </button>
-                ) : (
-                  <Link
-                    to={`/admin/releases/${release.id}/edit`}
-                    className="text-xs px-3 py-1 rounded-md border text-[var(--color-fg-muted)] hover:text-[#6C3FF5] hover:border-[#6C3FF5] transition-all no-underline"
-                  >
-                    编辑
-                  </Link>
-                )}
+                <Link
+                  to={`/admin/releases/${release.id}/edit`}
+                  className="text-xs px-3 py-1 rounded-md border text-[var(--color-fg-muted)] hover:text-[#6C3FF5] hover:border-[#6C3FF5] transition-all no-underline"
+                >
+                  编辑
+                </Link>
                 <button
                   onClick={() => onDelete(release.id)}
                   disabled={deleting === release.id}

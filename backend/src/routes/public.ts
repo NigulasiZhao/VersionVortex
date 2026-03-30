@@ -8,25 +8,38 @@ router.get('/releases', (req: Request, res: Response) => {
   try {
     const packageFilter = req.query.package as string | undefined;
     let query = `
-      SELECT r.*, p.name as package_name, p.description as package_description,
-        (SELECT COUNT(*) FROM assets WHERE release_id = r.id) as asset_count,
-        (SELECT SUM(download_count) FROM assets WHERE release_id = r.id) as total_downloads,
-        (SELECT GROUP_CONCAT(DISTINCT pk.name ORDER BY pk.name) FROM releases rk JOIN packages pk ON rk.package_id = pk.id WHERE rk.unified_session_id = r.unified_session_id AND rk.unified_session_id IS NOT NULL) as all_package_names
+      SELECT r.*,
+        (SELECT COUNT(*) FROM assets a JOIN packages p ON a.package_id = p.id WHERE a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%') as asset_count,
+        (SELECT SUM(a.download_count) FROM assets a JOIN packages p ON a.package_id = p.id WHERE a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%') as total_downloads,
+        (SELECT GROUP_CONCAT(DISTINCT COALESCE(pk.alias, pk.name) ORDER BY pk.name) FROM packages pk WHERE pk.id IN (SELECT DISTINCT a.package_id FROM assets a WHERE a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%')) as all_package_names
       FROM releases r
-      JOIN packages p ON r.package_id = p.id
       WHERE r.is_draft = 0
     `;
     const params: any[] = [];
 
     if (packageFilter && packageFilter !== 'all') {
-      // Filter by package: either the release belongs to this package, or has assets from this package
-      query += ` AND (p.name = ? OR EXISTS (SELECT 1 FROM assets a JOIN packages pk ON a.package_id = pk.id WHERE a.release_id = r.id AND pk.name = ?))`;
-      params.push(packageFilter, packageFilter);
+      // Filter by package: the release has packages with this name
+      query += ` AND EXISTS (SELECT 1 FROM packages p WHERE p.releases_id = r.id AND p.name = ?)`;
+      params.push(packageFilter);
     }
 
     query += ` ORDER BY r.created_at DESC`;
 
     const releases = getDb().prepare(query).all(...params);
+
+    // Attach package info to each release
+    for (const release of releases) {
+      const packages = getDb().prepare(`
+        SELECT p.name as package_name, p.description as package_description, p.alias
+        FROM packages p
+        WHERE p.releases_id = ?
+      `).all((release as any).id);
+      if (packages.length > 0) {
+        (release as any).package_name = packages[0].package_name;
+        (release as any).package_description = packages[0].package_description;
+      }
+    }
+
     res.json(releases);
   } catch (err) {
     res.status(500).json({ error: '获取版本列表失败' });
@@ -37,9 +50,8 @@ router.get('/releases', (req: Request, res: Response) => {
 router.get('/releases/:tag', (req: Request, res: Response) => {
   try {
     const release = getDb().prepare(`
-      SELECT r.*, p.name as package_name, p.description as package_description, p.homepage
+      SELECT r.*
       FROM releases r
-      JOIN packages p ON r.package_id = p.id
       WHERE r.tag_name = ?
     `).get(req.params.tag) as any;
 
@@ -47,25 +59,37 @@ router.get('/releases/:tag', (req: Request, res: Response) => {
       return res.status(404).json({ error: '版本不存在' });
     }
 
+    // Get package info for this release (by matching assets)
+    const normalizedTag = release.tag_name.replace('v', '');
+    const packages = getDb().prepare(`
+      SELECT DISTINCT p.name as package_name, p.description as package_description, p.homepage, p.alias
+      FROM packages p
+      WHERE p.id IN (SELECT DISTINCT a.package_id FROM assets a WHERE a.name LIKE '%' || ? || '%')
+    `).all(normalizedTag);
+    if (packages.length > 0) {
+      release.package_name = packages[0].package_name;
+      release.package_description = packages[0].package_description;
+      release.homepage = packages[0].homepage;
+    }
+
+    // Get assets by matching asset name with release tag
     let assets: any[];
     if (release.release_type === 'unified' && release.unified_session_id) {
       // 统一发版：获取同一 session 下所有包的 assets，包含包名
       assets = getDb().prepare(`
         SELECT a.*, p.name as package_name, p.alias as package_alias
         FROM assets a
-        JOIN releases r ON a.release_id = r.id
-        JOIN packages p ON r.package_id = p.id
-        WHERE r.unified_session_id = ?
-        ORDER BY r.package_id
-      `).all(release.unified_session_id);
+        JOIN packages p ON a.package_id = p.id
+        WHERE a.name LIKE '%' || ? || '%'
+        ORDER BY p.id
+      `).all(normalizedTag);
     } else {
       assets = getDb().prepare(`
         SELECT a.*, p.name as package_name, p.alias as package_alias
         FROM assets a
-        JOIN releases r ON a.release_id = r.id
-        JOIN packages p ON r.package_id = p.id
-        WHERE a.release_id = ?
-      `).all(release.id);
+        JOIN packages p ON a.package_id = p.id
+        WHERE a.name LIKE '%' || ? || '%'
+      `).all(normalizedTag);
     }
     res.json({ ...release, assets });
   } catch (err) {
@@ -78,9 +102,9 @@ router.get('/packages', (_req: Request, res: Response) => {
   try {
     const packages = getDb().prepare(`
       SELECT p.*,
-        (SELECT COUNT(*) FROM releases WHERE package_id = p.id AND is_draft = 0) as release_count,
-        (SELECT MAX(created_at) FROM releases WHERE package_id = p.id AND is_draft = 0) as latest_release_date,
-        (SELECT tag_name FROM releases WHERE package_id = p.id AND is_draft = 0 ORDER BY created_at DESC LIMIT 1) as latest_tag
+        (SELECT COUNT(*) FROM releases WHERE id = p.releases_id AND is_draft = 0) as release_count,
+        (SELECT MAX(created_at) FROM releases WHERE id = p.releases_id AND is_draft = 0) as latest_release_date,
+        (SELECT tag_name FROM releases WHERE id = p.releases_id AND is_draft = 0 ORDER BY created_at DESC LIMIT 1) as latest_tag
       FROM packages p
       ORDER BY p.name ASC
     `).all();
@@ -100,12 +124,13 @@ router.get('/packages/:name/releases', (req: Request, res: Response) => {
 
     const releases = getDb().prepare(`
       SELECT r.*,
-        (SELECT COUNT(*) FROM assets WHERE release_id = r.id) as asset_count,
-        (SELECT SUM(download_count) FROM assets WHERE release_id = r.id) as total_downloads
+        (SELECT COUNT(*) FROM assets a WHERE a.package_id = p.id) as asset_count,
+        (SELECT SUM(a.download_count) FROM assets a WHERE a.package_id = p.id) as total_downloads
       FROM releases r
-      WHERE r.package_id = ? AND r.is_draft = 0
+      JOIN packages p ON p.releases_id = r.id
+      WHERE p.name = ? AND r.is_draft = 0
       ORDER BY r.created_at DESC
-    `).all((pkg as any).id);
+    `).all(req.params.name);
     res.json(releases);
   } catch (err) {
     res.status(500).json({ error: '获取版本列表失败' });
@@ -119,8 +144,7 @@ router.get('/assets/:id/download', (req: Request, res: Response) => {
     const asset = getDb().prepare(`
       SELECT a.*, p.name as package_name, p.alias as package_alias
       FROM assets a
-      JOIN releases r ON a.release_id = r.id
-      JOIN packages p ON r.package_id = p.id
+      JOIN packages p ON a.package_id = p.id
       WHERE a.id = ?
     `).get(req.params.id) as any;
 

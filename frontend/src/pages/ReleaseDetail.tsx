@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { getRelease, downloadAsset, getPackages } from '../services/api';
 import type { Release, Package } from '../types';
-import { ArrowLeft, Download, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, Folder } from 'lucide-react';
+import { TreeView, TreeNode } from '../components/ui/tree-view';
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B';
@@ -56,6 +57,31 @@ export default function ReleaseDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [selectedAssets, setSelectedAssets] = useState<Set<number>>(new Set());
+
+  const toggleAssetSelection = (assetId: number) => {
+    const newSelected = new Set(selectedAssets);
+    if (newSelected.has(assetId)) {
+      newSelected.delete(assetId);
+    } else {
+      newSelected.add(assetId);
+    }
+    setSelectedAssets(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedAssets.size === release?.assets?.length) {
+      setSelectedAssets(new Set());
+    } else {
+      setSelectedAssets(new Set(release?.assets?.map(a => a.id) || []));
+    }
+  };
+
+  const handleDownloadSelected = () => {
+    selectedAssets.forEach(assetId => {
+      downloadAsset(assetId);
+    });
+  };
 
   useEffect(() => {
     if (!tag) return;
@@ -155,9 +181,9 @@ export default function ReleaseDetail() {
         </div>
 
         {/* Content grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Changelog */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden animate-slide-in">
               <div className="px-5 py-3 border-b border-[var(--color-border-default)]" style={{ background: 'var(--color-canvas-subtle)' }}>
                 <h3 className="text-sm font-semibold text-[var(--color-fg-default)] flex items-center gap-2">
@@ -176,54 +202,94 @@ export default function ReleaseDetail() {
           </div>
 
           {/* Downloads */}
-          <div className="lg:col-span-1">
+          <div>
             <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden sticky top-4 animate-slide-in-right">
-              <div className="px-5 py-3 border-b border-[var(--color-border-default)]" style={{ background: 'var(--color-canvas-subtle)' }}>
-                <h3 className="text-sm font-semibold text-[var(--color-fg-default)] flex items-center gap-2">
-                  <Download className="w-4 h-4" style={{ color: '#6C3FF5' }} />
-                  Downloads ({release.assets?.length || 0})
-                </h3>
+              <div className="px-5 py-3 border-b border-[var(--color-border-default)] flex items-center justify-between min-h-[52px]" style={{ background: 'var(--color-canvas-subtle)' }}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={release.assets?.length > 0 && selectedAssets.size === release.assets?.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-[var(--color-border-default)] text-[#6C3FF5] focus:ring-[#6C3FF5]"
+                  />
+                  <h3 className="text-sm font-semibold text-[var(--color-fg-default)] flex items-center gap-2">
+                    <Download className="w-4 h-4" style={{ color: '#6C3FF5' }} />
+                    Downloads ({release.assets?.length || 0})
+                  </h3>
+                </div>
+                <div className="w-[120px] flex justify-end">
+                  <button
+                    onClick={handleDownloadSelected}
+                    className="text-xs px-3 py-1.5 rounded-lg text-white transition-all"
+                    style={{
+                      background: '#6C3FF5',
+                      opacity: selectedAssets.size > 0 ? 1 : 0,
+                      pointerEvents: selectedAssets.size > 0 ? 'auto' : 'none'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#5B35E0'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#6C3FF5'}
+                  >
+                    下载已选 ({selectedAssets.size})
+                  </button>
+                </div>
               </div>
-              <div className="divide-y divide-[var(--color-border-muted)]">
+              <div className="max-h-[500px] overflow-y-auto">
                 {!release.assets || release.assets.length === 0 ? (
                   <div className="px-5 py-6 text-center text-sm text-[var(--color-fg-muted)]">
                     暂无下载文件
                   </div>
                 ) : (
-                  release.assets.map((asset) => {
-                    // Replace package name with alias in the asset name
-                    const pkgName = asset.package_name || '';
-                    const pkgAlias = asset.package_alias || pkgName;
-                    const displayName = pkgName ? asset.name.replace(pkgName, pkgAlias) : asset.name;
+                  (() => {
+                    // Group assets by package
+                    const packageGroups: Record<string, typeof release.assets> = {};
+                    release.assets.forEach(asset => {
+                      const pkgKey = asset.package_alias || asset.package_name || 'Other';
+                      if (!packageGroups[pkgKey]) {
+                        packageGroups[pkgKey] = [];
+                      }
+                      packageGroups[pkgKey].push(asset);
+                    });
+
+                    // Build tree data
+                    const treeData: TreeNode[] = Object.entries(packageGroups).map(([pkgName, assets]) => ({
+                      id: `pkg-${pkgName}`,
+                      label: pkgName,
+                      icon: <Folder className="h-4 w-4" style={{ color: '#6C3FF5' }} />,
+                      children: assets.map(asset => {
+                        const pkgNameStr = asset.package_name || '';
+                        const pkgAliasStr = asset.package_alias || pkgNameStr;
+                        const displayName = pkgNameStr ? asset.name.replace(pkgNameStr, pkgAliasStr) : asset.name;
+                        return {
+                          id: `asset-${asset.id}`,
+                          label: displayName,
+                          icon: <span className="text-base">{getFileIcon(asset.name)}</span>,
+                          data: { ...asset, displayName },
+                        };
+                      }),
+                    }));
+
                     return (
-                      <div key={asset.id} className="px-4 py-3 flex items-center gap-3 hover:bg-[var(--color-canvas-subtle)] transition-colors">
-                        <span className="text-xl shrink-0">{getFileIcon(asset.name)}</span>
-                        <div className="flex-1 min-w-0">
-                          <button
-                            onClick={() => handleDownload(asset.id)}
-                            className="text-sm text-[#6C3FF5] hover:underline text-left font-medium block w-full truncate transition-colors"
-                          >
-                            {displayName}
-                          </button>
-                          <div className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">
-                            <span>{formatBytes(asset.size)}</span>
-                            <span>·</span>
-                            <span>{Number(asset.download_count).toLocaleString()} 次下载</span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleDownload(asset.id)}
-                          disabled={downloading === asset.id}
-                          className="shrink-0 text-xs px-3 py-1.5 rounded-lg text-white transition-all"
-                          style={{ background: downloading === asset.id ? '#A78BFA' : '#6C3FF5' }}
-                          onMouseEnter={(e) => { if (downloading !== asset.id) e.currentTarget.style.background = '#5B35E0'; }}
-                          onMouseLeave={(e) => { if (downloading !== asset.id) e.currentTarget.style.background = '#6C3FF5'; }}
-                        >
-                          {downloading === asset.id ? '下载中' : '下载'}
-                        </button>
-                      </div>
+                      <TreeView
+                        data={treeData}
+                        defaultExpandedIds={Object.keys(packageGroups).map(pkg => `pkg-${pkg}`)}
+                        showIcons={true}
+                        showLines={false}
+                        selectable={true}
+                        multiSelect={true}
+                        selectedAssets={selectedAssets}
+                        onSelectionChange={(ids) => {
+                          const assetIds = ids
+                            .filter(id => id.startsWith('asset-'))
+                            .map(id => parseInt(id.replace('asset-', '')));
+                          setSelectedAssets(new Set(assetIds));
+                        }}
+                        onNodeClick={() => {}}
+                        onAssetDownload={handleDownload}
+                        downloadingAssetId={downloading}
+                        className="border-0"
+                      />
                     );
-                  })
+                  })()
                 )}
               </div>
             </div>

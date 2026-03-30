@@ -123,19 +123,12 @@ function incrementVersion(latestTag: string | null, mode: 'minor' | 'patch' = 'p
 }
 
 // Helper: calculate unified version (highest minor among selected packages + 1, patch=0)
-function calculateUnifiedVersion(packageIds: number[]): string {
-  let highestVersion = '0.0.0';
-  for (const pkgId of packageIds) {
-    const latest = getDb().prepare(
-      'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
-    ).get(pkgId) as any;
-    if (latest?.tag_name) {
-      const v = latest.tag_name.replace(/^v/, '');
-      if (compareVersions(v, highestVersion) > 0) {
-        highestVersion = v;
-      }
-    }
-  }
+function calculateUnifiedVersion(_packageIds: number[]): string {
+  // Get highest version directly from releases table
+  const latest = getDb().prepare(
+    'SELECT tag_name FROM releases ORDER BY created_at DESC LIMIT 1'
+  ).get() as any;
+  let highestVersion = latest?.tag_name?.replace(/^v/, '') || '0.0.0';
   const match = highestVersion.match(/^v?(\d+)\.(\d+)\.(\d+)(.*)$/);
   if (!match) return '1.0.0';
   const [, major, minor] = match;
@@ -430,9 +423,14 @@ async function triggerPackageBuilds(sessionId: string, configs: any[], tagName: 
     const db = getDb();
     const failedPkgIds = session.packages.filter(p => p.status === 'failed').map(p => p.package_id);
     // Mark releases from this session as draft (soft rollback)
+    // Now using packages.releases_id -> releases (new schema)
     db.prepare(`
       UPDATE releases SET is_draft = 1, body = '统一发版失败，已回滚'
-      WHERE unified_session_id = ? AND package_id IN (${failedPkgIds.map(() => '?').join(',')})
+      WHERE unified_session_id = ?
+      AND id IN (
+        SELECT p.releases_id FROM packages p
+        WHERE p.id IN (${failedPkgIds.map(() => '?').join(',')})
+      )
     `).run(sessionId, ...failedPkgIds);
   }
 
@@ -601,22 +599,52 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
 
   pkg.artifact_names = matchedArtifacts.map((a: any) => path.basename(a.relativePath));
 
-  // Create release first (use first package's release as the canonical one, or create if doesn't exist)
-  // Check if a release with this tag_name already exists (from another package in the same batch)
-  let release = getDb().prepare(
-    'SELECT id FROM releases WHERE tag_name = ? AND package_id = ? LIMIT 1'
-  ).get(tagName, config.package_id) as any;
-  let releaseId = release?.id;
+  // New schema: releases is main table, packages has releases_id foreign key
+  // Release creation order: releases -> packages (with releases_id) -> assets (with package_id)
 
-  if (!releaseId) {
-    // For unified releases, set unified_session_id to track the session
-    const unifiedSessionId = releaseType === 'unified' ? sessionId : null;
-    getDb().prepare(
-      'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(config.package_id, tagName, `Build #${buildNumber}`, '', 0, 0, releaseType, unifiedSessionId);
-    release = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? AND package_id = ? LIMIT 1').get(tagName, config.package_id) as any;
-    releaseId = release?.id;
+  // For unified releases: all packages share one release (by tag_name)
+  // For single releases: each package gets its own release
+  let releaseId: number | null = null;
+
+  if (releaseType === 'unified') {
+    // Check if a release with this tag_name already exists (for unified, reuse it)
+    const existingRelease = getDb().prepare(
+      'SELECT id FROM releases WHERE tag_name = ? LIMIT 1'
+    ).get(tagName) as any;
+    releaseId = existingRelease?.id;
+
+    if (!releaseId) {
+      const unifiedSessionId = sessionId;
+      getDb().prepare(
+        'INSERT INTO releases (tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(tagName, `Build #${buildNumber}`, '', 0, 0, releaseType, unifiedSessionId);
+      const newRelease = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? LIMIT 1').get(tagName) as any;
+      releaseId = newRelease?.id;
+    }
+  } else {
+    // Single release: check if this package already has a release with this tag_name
+    const existingRelease = getDb().prepare(
+      'SELECT r.id FROM releases r WHERE r.tag_name = ? AND r.id = (SELECT p.releases_id FROM packages p WHERE p.id = ?) LIMIT 1'
+    ).get(tagName, config.package_id) as any;
+    releaseId = existingRelease?.id;
+
+    if (!releaseId) {
+      getDb().prepare(
+        'INSERT INTO releases (tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(tagName, `Build #${buildNumber}`, '', 0, 0, releaseType, null);
+      const newRelease = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? LIMIT 1').get(tagName) as any;
+      releaseId = newRelease?.id;
+    }
   }
+
+  // Create or update package with releases_id
+  const existingPackage = getDb().prepare('SELECT id FROM packages WHERE id = ?').get(config.package_id) as any;
+  if (existingPackage) {
+    getDb().prepare(
+      'UPDATE packages SET releases_id = ?, version = ?, description = ?, homepage = ? WHERE id = ?'
+    ).run(releaseId, tagName, `Build #${buildNumber}`, config.homepage || '', config.package_id);
+  }
+
   console.log(`[Jenkins] release created: id=${releaseId} tag=${tagName} pkg=${config.package_id}`);
 
   // Download all matched artifacts sequentially
@@ -635,9 +663,10 @@ async function buildSinglePackage(sessionId: string, idx: number, config: any, t
     try {
       await downloadFile(artifactUrl, localPath, credentials);
       const fileSize = fs.statSync(localPath).size;
+      // New schema: assets.package_id is FK to packages
       getDb().prepare(
-        'INSERT INTO assets (release_id, package_id, name, size, file_path) VALUES (?, ?, ?, ?, ?)'
-      ).run(releaseId, config.package_id, fileName, fileSize, localPath);
+        'INSERT INTO assets (package_id, name, size, file_path) VALUES (?, ?, ?, ?)'
+      ).run(config.package_id, fileName, fileSize, localPath);
       downloadedNames.push(fileName);
       downloadedSizes.push(fileSize);
     } catch (err: any) {
@@ -713,9 +742,10 @@ router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, as
 
     // Step 1: Trigger build with version parameter (single release uses patch++)
     let buildNumber: number | null = null;
+    // Find the latest release tag_name directly from releases table
     const latestRelease = getDb().prepare(
-      'SELECT tag_name FROM releases WHERE package_id = ? ORDER BY created_at DESC LIMIT 1'
-    ).get(package_id) as any;
+      'SELECT tag_name FROM releases ORDER BY created_at DESC LIMIT 1'
+    ).get() as any;
     const tagName = incrementVersion(latestRelease?.tag_name, 'patch');
     const triggerTime = Date.now();
 
@@ -775,12 +805,11 @@ router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, as
 
     if (!buildNumber) {
       // Couldn't get build number, create a release anyway
+      // New schema: releases -> packages (with releases_id)
       getDb().prepare(
-        'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(package_id, tagName, `Build triggered`, '', 0, 0, 'single', null);
-      const release = getDb().prepare(
-        'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
-      ).get(package_id, tagName) as any;
+        'INSERT INTO releases (tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(tagName, `Build triggered`, '', 0, 0, 'single', null);
+      const release = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? LIMIT 1').get(tagName) as any;
       const releaseId = release?.id;
 
       return res.status(202).json({
@@ -839,12 +868,11 @@ router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, as
     const matchedArtifacts = artifacts.filter((a: any) => matchGlob(a.relativePath, pattern));
 
     if (matchedArtifacts.length === 0) {
+      // New schema: releases are standalone, packages are project configs
       getDb().prepare(
-        'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(package_id, tagName, `Build #${buildNumber}`, '', 0, 0, 'single', null);
-      const release = getDb().prepare(
-        'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
-      ).get(package_id, tagName) as any;
+        'INSERT INTO releases (tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(tagName, `Build #${buildNumber}`, '', 0, 0, 'single', null);
+      const release = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? LIMIT 1').get(tagName) as any;
       const releaseId = release?.id;
 
       return res.status(201).json({
@@ -859,12 +887,11 @@ router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, as
     }
 
     // Step 4: Create release
+    // New schema: releases -> packages (with releases_id)
     getDb().prepare(
-      'INSERT INTO releases (package_id, tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(package_id, tagName, `Build #${buildNumber}`, '', 0, 0, 'single', null);
-    const release = getDb().prepare(
-      'SELECT id FROM releases WHERE package_id = ? AND tag_name = ?'
-    ).get(package_id, tagName) as any;
+      'INSERT INTO releases (tag_name, title, body, is_draft, is_prerelease, release_type, unified_session_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(tagName, `Build #${buildNumber}`, '', 0, 0, 'single', null);
+    const release = getDb().prepare('SELECT id FROM releases WHERE tag_name = ? LIMIT 1').get(tagName) as any;
     const releaseId = release?.id;
 
     // Step 5: Download all matched artifacts sequentially
@@ -880,9 +907,10 @@ router.post('/jenkins-build/single-release', authenticateToken, requireAdmin, as
       try {
         await downloadFile(artifactUrl, localPath, credentials);
         const fileSize = fs.statSync(localPath).size;
+        // New schema: assets.package_id is FK to packages
         getDb().prepare(
-          'INSERT INTO assets (release_id, package_id, name, size, file_path) VALUES (?, ?, ?, ?, ?)'
-        ).run(releaseId, package_id, fileName, fileSize, localPath);
+          'INSERT INTO assets (package_id, name, size, file_path) VALUES (?, ?, ?, ?)'
+        ).run(package_id, fileName, fileSize, localPath);
         downloaded.push({ name: fileName, size: fileSize });
       } catch (err: any) {
         downloadFailed = true;
