@@ -325,29 +325,30 @@ e2e/tests/
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | INTEGER PRIMARY KEY | 主键 |
-| package_id | INTEGER NOT NULL | 外键关联 packages |
 | tag_name | TEXT NOT NULL | 版本号（如 1.0.0） |
 | title | TEXT | 版本标题 |
 | body | TEXT | 变更日志（Markdown格式） |
 | is_draft | INTEGER DEFAULT 0 | 是否草稿 |
 | is_prerelease | INTEGER DEFAULT 0 | 是否预发布 |
+| release_type | TEXT DEFAULT 'single' | 发版类型（single/unified） |
 | unified_session_id | TEXT | 统一发版会话 ID（统一发版时所有包共享同一 ID） |
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
-**唯一约束**: (package_id, tag_name)
+**说明**: releases 为主表，版本通过 tag_name 与 assets 关联（非外键）
 
 #### assets (下载文件表)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | INTEGER PRIMARY KEY | 主键 |
-| release_id | INTEGER NOT NULL | 外键关联 releases |
-| package_id | INTEGER | 关联的包ID |
+| package_id | INTEGER NOT NULL | 外键关联 packages |
 | name | TEXT NOT NULL | 文件名 |
 | size | INTEGER NOT NULL | 文件大小(字节) |
 | download_count | INTEGER DEFAULT 0 | 下载次数 |
 | file_path | TEXT NOT NULL | 文件路径 |
 | created_at | DATETIME | 创建时间 |
+
+**说明**: assets 通过文件名中的版本号（tag_name）匹配关联到 releases
 
 #### jenkins_configs (Jenkins配置表)
 | 字段 | 类型 | 说明 |
@@ -390,9 +391,12 @@ e2e/tests/
 
 ```
 users (无外键)
-packages (1) ←→ (N) releases
+packages (1) ←→ (N) assets
 packages (1) ←→ (N) jenkins_configs
 packages (1) ←→ (N) build_packages
-releases (1) ←→ (N) assets
+releases ←→ (N) assets (通过 tag_name 匹配，非外键)
+releases (1) ←→ (N) unified_session_id (同一统一发版)
 build_sessions (1) ←→ (N) build_packages
 ```
+
+**说明**: releases 与 assets 通过文件名中的版本号 tag_name 关联（软关联），非数据库外键约束。
