@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ReleaseButton } from "@/components/ui/release-button";
 import { HoverTabs } from "@/components/ui/hover-tabs";
 import { AnimatedTableRow } from "@/components/ui/animated-table";
+import { ArkCheckboxWithLabel, ArkCheckbox } from "@/components/ui/checkbox-1";
 import {
   getAdminReleases,
   getAdminPackages,
@@ -758,27 +759,25 @@ export default function AdminDashboard() {
         >
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {packages.filter(p => jenkinsConfigs[p.id]).map((pkg) => (
-              <label
+              <div
                 key={pkg.id}
                 className="flex items-center gap-3 p-2 rounded-lg border border-[var(--color-border-default)] cursor-pointer hover:bg-[var(--color-canvas-subtle)] transition-all"
               >
-                <input
-                  type="checkbox"
+                <ArkCheckbox
                   checked={selectedPackageIds.includes(pkg.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
+                  onChange={(checked) => {
+                    if (checked) {
                       setSelectedPackageIds([...selectedPackageIds, pkg.id]);
                     } else {
                       setSelectedPackageIds(selectedPackageIds.filter(id => id !== pkg.id));
                     }
                   }}
-                  className="w-4 h-4 rounded border-[var(--color-border-default)]"
                 />
                 <span className="font-mono text-sm">{pkg.name}</span>
                 {pkg.description && (
                   <span className="text-xs text-[var(--color-fg-muted)] truncate">{pkg.description}</span>
                 )}
-              </label>
+              </div>
             ))}
           </div>
           <div className="flex gap-2 mt-4">
