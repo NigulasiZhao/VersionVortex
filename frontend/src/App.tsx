@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import Layout from './components/Layout';
-import { Particles } from './components/Particles';
+import { TheInfiniteGrid } from './components/ui/the-infinite-grid';
 import { ToastProvider } from './components/ui/toast';
 import Home from './pages/Home';
 import ReleaseDetail from './pages/ReleaseDetail';
@@ -70,7 +70,7 @@ function AnimatedRoutes() {
 
   return (
     <>
-      <Particles visible={showParticles} />
+      <TheInfiniteGrid />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
         {/* Public routes - require authentication */}

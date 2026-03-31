@@ -31,7 +31,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'transparent' }}>
       {/* Header */}
-      <header className="sticky top-0 z-40" style={{ background: 'rgba(250,250,249,0.95)', backdropFilter: 'blur(10px)' }}>
+      <header className="sticky top-0 z-40" style={{ background: 'rgba(250,250,249,0.8)', backdropFilter: 'blur(12px)' }}>
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-2 no-underline group">
