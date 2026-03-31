@@ -34,6 +34,18 @@ export interface ReleaseFilters {
   search?: string;
   startDate?: string;
   endDate?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedReleases {
+  releases: any[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export const getReleases = (filters?: ReleaseFilters) => {
@@ -50,7 +62,13 @@ export const getReleases = (filters?: ReleaseFilters) => {
   if (filters?.endDate) {
     params.endDate = filters.endDate;
   }
-  return api.get('/releases', { params }).then((r) => r.data);
+  if (filters?.page) {
+    params.page = String(filters.page);
+  }
+  if (filters?.pageSize) {
+    params.pageSize = String(filters.pageSize);
+  }
+  return api.get('/releases', { params }).then((r) => r.data as PaginatedReleases);
 };
 export const getRelease = (tag: string) => api.get(`/releases/${tag}`).then((r) => r.data);
 export const getPackages = () => api.get('/packages').then((r) => r.data);

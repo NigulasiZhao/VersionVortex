@@ -90,8 +90,8 @@ export function FluidDropdown({ options, value, onChange }: FluidDropdownProps) 
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "inline-flex items-center justify-between rounded-xl text-sm font-medium transition-all duration-200",
-            "border cursor-pointer px-4 py-2 min-w-[140px]",
+            "inline-flex items-center justify-between rounded-lg text-sm font-medium transition-all duration-200",
+            "border cursor-pointer px-3 py-1.5 min-w-[140px]",
             "hover:border-[#6C3FF5] hover:text-[#6C3FF5]",
             isOpen && "border-[#6C3FF5] text-[#6C3FF5]",
           )}

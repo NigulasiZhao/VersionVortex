@@ -215,7 +215,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             "inline-flex items-center gap-2 rounded-lg text-sm font-medium transition-all duration-200",
-            "border px-3 py-1.5",
+            "border px-3 py-1.5 min-w-[120px]",
             "hover:border-[#6C3FF5] hover:text-[#6C3FF5]",
             isOpen && "border-[#6C3FF5] text-[#6C3FF5]",
             hasValue && "text-[#6C3FF5]"
@@ -225,7 +225,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
             borderColor: isOpen ? "#6C3FF5" : "var(--color-border-default)",
           }}
         >
-          <Calendar className="w-4 h-4" />
+          <Calendar className="w-4 h-4" style={{ color: "#6C3FF5" }} />
           <span>{displayText()}</span>
         </button>
 

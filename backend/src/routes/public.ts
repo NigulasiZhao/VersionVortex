@@ -3,13 +3,15 @@ import { getDb } from '../db/index';
 
 const router = Router();
 
-// GET /api/releases - Get all published releases with optional filters
+// GET /api/releases - Get all published releases with optional filters and pagination
 router.get('/releases', (req: Request, res: Response) => {
   try {
     const packageFilter = req.query.package as string | undefined;
     const search = req.query.search as string | undefined;
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 10;
 
     let query = `
       SELECT r.*,
@@ -19,25 +21,39 @@ router.get('/releases', (req: Request, res: Response) => {
       FROM releases r
       WHERE r.is_draft = 0
     `;
+    let countQuery = `SELECT COUNT(*) as total FROM releases r WHERE r.is_draft = 0`;
     const params: any[] = [];
+    const countParams: any[] = [];
 
     // Package filter
     if (packageFilter && packageFilter !== 'all') {
       query += ` AND EXISTS (SELECT 1 FROM packages p WHERE p.name = ? AND EXISTS (SELECT 1 FROM assets a WHERE a.package_id = p.id AND a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%'))`;
+      countQuery += ` AND EXISTS (SELECT 1 FROM packages p WHERE p.name = ? AND EXISTS (SELECT 1 FROM assets a WHERE a.package_id = p.id AND a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%'))`;
       params.push(packageFilter);
+      countParams.push(packageFilter);
     }
 
     // Date range filter
     if (startDate) {
       query += ` AND DATE(r.created_at) >= DATE(?)`;
+      countQuery += ` AND DATE(r.created_at) >= DATE(?)`;
       params.push(startDate);
+      countParams.push(startDate);
     }
     if (endDate) {
       query += ` AND DATE(r.created_at) <= DATE(?)`;
+      countQuery += ` AND DATE(r.created_at) <= DATE(?)`;
       params.push(endDate);
+      countParams.push(endDate);
     }
 
-    query += ` ORDER BY r.created_at DESC`;
+    // Get total count before pagination
+    const totalResult = getDb().prepare(countQuery).get(...countParams) as { total: number };
+    const total = totalResult?.total || 0;
+
+    // Apply pagination
+    query += ` ORDER BY r.created_at DESC LIMIT ? OFFSET ?`;
+    params.push(pageSize, (page - 1) * pageSize);
 
     const releases = getDb().prepare(query).all(...params);
 
@@ -66,7 +82,15 @@ router.get('/releases', (req: Request, res: Response) => {
       return true;
     });
 
-    res.json(filteredReleases);
+    res.json({
+      releases: filteredReleases,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    });
   } catch (err) {
     res.status(500).json({ error: '获取版本列表失败' });
   }

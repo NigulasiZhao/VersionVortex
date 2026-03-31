@@ -1,10 +1,12 @@
-import { useState, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { getReleases, getPackages, getStats, type ReleaseFilters } from "../services/api";
 import type { Release, Package } from "../types";
 import { Timeline } from "../components/ui/Timeline";
 import type { DateRange } from "../components/ui/DateRangePicker";
 import { Sparkles, Package as PackageIcon, Tag, Download } from "lucide-react";
+
+const PAGE_SIZE = 10;
 
 export default function Home() {
   const { name: packageName } = useParams();
@@ -17,14 +19,22 @@ export default function Home() {
   const [searchText, setSearchText] = useState("");
   const [searchQuery, setSearchQuery] = useState(""); // Confirmed search query (on Enter)
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
   const [scrollRestored, setScrollRestored] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Check if returning from detail page (use cache) or fresh load (fetch API)
   const isReturningFromDetail = location.state?.fromDetail === true;
 
   // Fetch releases with current filters
-  const fetchReleases = useCallback(() => {
-    const filters: ReleaseFilters = {};
+  const fetchReleases = useCallback((pageNum: number = 1, append: boolean = false) => {
+    const filters: ReleaseFilters = {
+      page: pageNum,
+      pageSize: PAGE_SIZE,
+    };
     if (selectedPackage !== "all") {
       filters.package = selectedPackage;
     }
@@ -37,10 +47,18 @@ export default function Home() {
     if (dateRange?.end) {
       filters.endDate = dateRange.end;
     }
-    return getReleases(filters);
+    return getReleases(filters).then((result) => {
+      if (append) {
+        setReleases(prev => [...prev, ...result.releases]);
+      } else {
+        setReleases(result.releases);
+      }
+      setHasMore(result.pagination.page < result.pagination.totalPages);
+      return result;
+    });
   }, [selectedPackage, searchQuery, dateRange]);
 
-  // Data loading - only use cache when returning from detail page
+  // Initial data loading - only use cache when returning from detail page
   useEffect(() => {
     if (isReturningFromDetail) {
       // Use cache when returning from detail page
@@ -60,13 +78,15 @@ export default function Home() {
     }
 
     // Always fetch from API on fresh load or when cache invalid
-    Promise.all([getReleases(), getPackages(), getStats()])
-      .then(([r, p, s]) => {
-        setReleases(r);
+    Promise.all([getReleases({ page: 1, pageSize: PAGE_SIZE }), getPackages(), getStats()])
+      .then(([rResult, p, s]) => {
+        setReleases(rResult.releases);
         setPackages(p);
         setStats(s);
+        setHasMore(rResult.pagination.page < rResult.pagination.totalPages);
+        setPage(1);
         // Cache the data for detail page returns
-        sessionStorage.setItem('home-cache', JSON.stringify({ releases: r, packages: p, stats: s }));
+        sessionStorage.setItem('home-cache', JSON.stringify({ releases: rResult.releases, packages: p, stats: s }));
       })
       .finally(() => setLoading(false));
   }, [isReturningFromDetail]);
@@ -74,9 +94,53 @@ export default function Home() {
   // Refetch releases when filters change
   useEffect(() => {
     if (!loading) {
-      fetchReleases().then((r) => setReleases(r));
+      setLoadingMore(true);
+      fetchReleases(1, false).finally(() => {
+        setLoadingMore(false);
+        setPage(1);
+      });
     }
   }, [fetchReleases, loading]);
+
+  // Load more when reaching bottom
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    fetchReleases(nextPage, true).then(() => {
+      setPage(nextPage);
+    }).finally(() => {
+      setLoadingMore(false);
+    });
+  }, [loadingMore, hasMore, page, fetchReleases]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (loading) return;
+
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [loading, hasMore, loadingMore, loadMore]);
 
   // Handle search on Enter key
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -190,19 +254,7 @@ export default function Home() {
         </div>
 
         {/* Timeline */}
-        {releases.length === 0 ? (
-          <div className="text-center py-16 animate-fade-in">
-            <div
-              className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, var(--color-canvas-subtle) 0%, rgba(108,63,245,0.1) 100%)" }}
-            >
-              <PackageIcon className="w-6 h-6" style={{ color: "var(--color-fg-muted)" }} />
-            </div>
-            <p style={{ color: "var(--color-fg-muted)" }}>暂无版本</p>
-          </div>
-        ) : (
-          <Timeline releases={releases} packages={packages} selectedPackage={selectedPackage} setSelectedPackage={setSelectedPackage} dateRange={dateRange} setDateRange={setDateRange} searchText={searchText} setSearchText={setSearchText} onSearchKeyDown={handleSearchKeyDown} onClearSearch={handleClearSearch} />
-        )}
+        <Timeline releases={releases} packages={packages} selectedPackage={selectedPackage} setSelectedPackage={setSelectedPackage} dateRange={dateRange} setDateRange={setDateRange} searchText={searchText} setSearchText={setSearchText} onSearchKeyDown={handleSearchKeyDown} onClearSearch={handleClearSearch} loadingMore={loadingMore} hasMore={hasMore} loadMoreRef={loadMoreRef} />
       </div>
     </div>
   );

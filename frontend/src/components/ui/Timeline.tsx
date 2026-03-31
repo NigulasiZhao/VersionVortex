@@ -240,7 +240,7 @@ function ReleaseCard({ release, isLatest, packageAliasMap }) {
   );
 }
 
-export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage, dateRange, setDateRange, searchText, setSearchText, onSearchKeyDown, onClearSearch }) {
+export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage, dateRange, setDateRange, searchText, setSearchText, onSearchKeyDown, onClearSearch, loadingMore, hasMore, loadMoreRef }) {
   // Create a map from package name to alias for quick lookup
   const packageAliasMap = {};
   packages.forEach((pkg) => {
@@ -260,7 +260,7 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2">
         <FluidDropdown
           options={dropdownOptions}
           value={selectedPackage}
@@ -270,15 +270,17 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
           value={dateRange}
           onChange={setDateRange}
         />
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--color-fg-muted)" }} />
+        <div className="relative flex-1 max-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#6C3FF5" }} />
           <input
             type="text"
-            placeholder="搜索版本号、包名..."
+            placeholder="搜索..."
             value={searchText || ""}
             onChange={(e) => setSearchText(e.target.value)}
             onKeyDown={onSearchKeyDown}
-            className="h-9 pl-9 pr-8 rounded-lg border text-sm w-[180px] placeholder:text-[var(--color-fg-muted)]"
+            onFocus={(e) => e.target.style.borderColor = "#6C3FF5"}
+            onBlur={(e) => e.target.style.borderColor = searchText ? "#6C3FF5" : "var(--color-border-default)"}
+            className="w-full h-8 pl-9 pr-8 rounded-lg border text-sm placeholder:text-[var(--color-fg-muted)] outline-none"
             style={{
               background: "var(--color-canvas-subtle)",
               borderColor: searchText ? "#6C3FF5" : "var(--color-border-default)",
@@ -306,7 +308,7 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
             className="text-center py-16"
             style={{ color: "var(--color-fg-muted)" }}
           >
-            暂无版本
+            <p>暂无版本</p>
           </motion.div>
         ) : (
           <div className="relative">
@@ -365,6 +367,15 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
         </div>
         )}
       </AnimatePresence>
+
+      {/* Loading more indicator */}
+      <div ref={loadMoreRef} className="py-4 text-center">
+        {loadingMore && (
+          <span className="text-sm" style={{ color: "var(--color-fg-muted)" }}>
+            加载中...
+          </span>
+        )}
+      </div>
       </div>
     </div>
   );
