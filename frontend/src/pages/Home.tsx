@@ -3,6 +3,7 @@ import { useParams, useLocation } from "react-router-dom";
 import { getReleases, getPackages, getStats } from "../services/api";
 import type { Release, Package } from "../types";
 import { Timeline } from "../components/ui/Timeline";
+import type { DateRange } from "../components/ui/DateRangePicker";
 import { Sparkles, Package as PackageIcon, Tag, Download } from "lucide-react";
 
 export default function Home() {
@@ -12,6 +13,7 @@ export default function Home() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [selectedPackage, setSelectedPackage] = useState<string>(packageName || "all");
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [loading, setLoading] = useState(true);
   const [scrollRestored, setScrollRestored] = useState(false);
 
@@ -166,7 +168,7 @@ export default function Home() {
             <p style={{ color: "var(--color-fg-muted)" }}>暂无版本</p>
           </div>
         ) : (
-          <Timeline releases={releases} packages={packages} selectedPackage={selectedPackage} setSelectedPackage={setSelectedPackage} />
+          <Timeline releases={releases} packages={packages} selectedPackage={selectedPackage} setSelectedPackage={setSelectedPackage} dateRange={dateRange} setDateRange={setDateRange} />
         )}
       </div>
     </div>

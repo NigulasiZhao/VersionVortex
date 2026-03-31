@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FluidDropdown } from "./FluidDropdown";
+import { DateRangePicker, type DateRange } from "./DateRangePicker";
 
 // 简单的 Markdown 解析为友好文本
 function parseMarkdownToText(body) {
@@ -239,7 +240,7 @@ function ReleaseCard({ release, isLatest, packageAliasMap }) {
   );
 }
 
-export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage }) {
+export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage, dateRange, setDateRange }) {
   // Create a map from package name to alias for quick lookup
   const packageAliasMap = {};
   packages.forEach((pkg) => {
@@ -250,14 +251,31 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
   const getPackageLabel = (pkg) => pkg.alias || pkg.name;
 
   const filteredReleases =
-    selectedPackage === "all"
-      ? releases
-      : releases.filter((r) => {
-          // Check if this release includes the selected package
-          // Use all_package_names if available, otherwise fall back to package_name
-          const allNames = r.all_package_names || r.package_name;
-          return allNames && allNames.split(',').includes(selectedPackage);
-        });
+    releases.filter((r) => {
+      // Package filter
+      if (selectedPackage !== "all") {
+        const selectedAlias = packageAliasMap[selectedPackage] || selectedPackage;
+        const allNames = r.all_package_names || r.package_name;
+        if (!allNames || !allNames.split(',').includes(selectedAlias)) {
+          return false;
+        }
+      }
+      // Date range filter
+      if (dateRange?.start || dateRange?.end) {
+        const releaseDate = new Date(r.created_at);
+        if (dateRange.start) {
+          const start = new Date(dateRange.start);
+          start.setHours(0, 0, 0, 0);
+          if (releaseDate < start) return false;
+        }
+        if (dateRange.end) {
+          const end = new Date(dateRange.end);
+          end.setHours(23, 59, 59, 999);
+          if (releaseDate > end) return false;
+        }
+      }
+      return true;
+    });
 
   const monthGroups = groupByMonth(filteredReleases);
 
@@ -269,11 +287,15 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
 
   return (
     <div className={className}>
-      <div>
+      <div className="flex items-center gap-3 flex-wrap">
         <FluidDropdown
           options={dropdownOptions}
           value={selectedPackage}
           onChange={setSelectedPackage}
+        />
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
         />
       </div>
 

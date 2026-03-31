@@ -18,8 +18,8 @@ router.get('/releases', (req: Request, res: Response) => {
     const params: any[] = [];
 
     if (packageFilter && packageFilter !== 'all') {
-      // Filter by package: the release has packages with this name
-      query += ` AND EXISTS (SELECT 1 FROM packages p WHERE p.releases_id = r.id AND p.name = ?)`;
+      // Filter by package: find packages with this name that have assets matching the release tag
+      query += ` AND EXISTS (SELECT 1 FROM packages p WHERE p.name = ? AND EXISTS (SELECT 1 FROM assets a WHERE a.package_id = p.id AND a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%'))`;
       params.push(packageFilter);
     }
 
