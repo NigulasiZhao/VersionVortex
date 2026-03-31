@@ -137,15 +137,11 @@ export function TreeView({
           style={{ paddingLeft: level * indent + 8 }}
           onClick={(e) => {
             const target = e.target as HTMLElement;
-            // If clicking expand area, only toggle expand
-            if (target.closest('.expand-area')) {
+            // If clicking expand area or checkbox wrapper, only handle that specific action
+            if (target.closest('.expand-area') || target.closest('.checkbox-wrapper')) {
               return;
             }
-            // If clicking checkbox wrapper, let checkbox handle it
-            if (target.closest('.checkbox-wrapper')) {
-              return;
-            }
-            // For asset rows, toggle selection
+            // For asset rows, toggle selection only (don't expand)
             if (isAssetNode && assetId !== null) {
               const newSelected = new Set(selectedAssets || []);
               if (newSelected.has(assetId)) {
@@ -156,10 +152,9 @@ export function TreeView({
               onSelectionChange?.(Array.from(newSelected).map(id => `asset-${id}`));
               return;
             }
-            // For folder nodes, toggle expand and selection
+            // For folder nodes, toggle expand only (don't toggle selection)
             if (hasChildren) {
               toggleExpanded(node.id);
-              handleSelection(node.id, e.ctrlKey || e.metaKey);
             }
           }}
           whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
@@ -169,11 +164,20 @@ export function TreeView({
             className="expand-area flex items-center justify-center w-6 h-6 mr-1 cursor-pointer"
             animate={{ rotate: hasChildren && isExpanded ? 90 : 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (hasChildren) {
+                toggleExpanded(node.id);
+              }
+            }}
           >
             {hasChildren ? (
               <ChevronRight className="h-3 w-3 text-[var(--color-fg-muted)]" />
             ) : isAssetNode ? (
-              <div className="checkbox-wrapper">
+              <div
+                className="checkbox-wrapper"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <ArkCheckbox
                   checked={isAssetSelected || false}
                   onChange={(checked) => {
