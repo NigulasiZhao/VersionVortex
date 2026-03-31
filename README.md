@@ -10,7 +10,7 @@
 - Vite
 - TailwindCSS
 - Framer Motion
-- Radix UI
+- @ark-ui/react
 
 ### 后端
 - Express
@@ -36,8 +36,8 @@ VersionVortex/
 │       ├── routes/          # 路由（admin.ts, public.ts, jenkins.ts）
 │       ├── middleware/      # 中间件（auth.ts 含 requireAdmin）
 │       └── db/              # 数据库
+│           └── data.db      # SQLite 数据库
 ├── uploads/                  # 上传文件存储
-├── data.db                   # SQLite 数据库
 ├── start.js                  # 启动脚本
 └── package.json              # 根配置
 ```
@@ -189,6 +189,7 @@ npm run dev
 | GET | /api/releases | 获取所有正式版本 |
 | GET | /api/releases/:tag | 获取版本详情 |
 | GET | /api/packages | 获取软件包列表 |
+| GET | /api/packages/:name/releases | 获取某软件包的所有版本 |
 | GET | /api/assets/:id/download | 下载文件 |
 | GET | /api/stats | 获取统计数据 |
 
@@ -196,6 +197,8 @@ npm run dev
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | /api/admin/login | 登录 |
+| POST | /api/admin/logout | 登出 |
+| POST | /api/admin/change-password | 修改密码 |
 | GET | /api/admin/releases | 获取所有版本（含草稿） |
 | POST | /api/admin/releases | 创建版本 |
 | PUT | /api/admin/releases/:id | 更新单包版本 |
@@ -205,6 +208,7 @@ npm run dev
 | DELETE | /api/admin/assets/:id | 删除附件 |
 | GET | /api/admin/packages | 获取软件包 |
 | POST | /api/admin/packages | 创建软件包 |
+| PUT | /api/admin/packages/:id | 更新软件包 |
 | DELETE | /api/admin/packages/:id | 删除软件包 |
 | GET | /api/admin/stats | 获取统计数据 |
 | GET | /api/admin/users | 获取用户列表 |
@@ -315,10 +319,13 @@ e2e/tests/
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | INTEGER PRIMARY KEY | 主键 |
+| releases_id | INTEGER | 外键关联 releases |
 | name | TEXT UNIQUE NOT NULL | 包名 |
+| version | TEXT | 当前版本号 |
 | alias | TEXT | 别名（如 PNM 别名显示） |
 | description | TEXT | 描述 |
 | homepage | TEXT | 主页/Git仓库地址 |
+| download_count | INTEGER DEFAULT 0 | 下载次数（汇总） |
 | created_at | DATETIME | 创建时间 |
 
 #### releases (版本表)
@@ -335,7 +342,7 @@ e2e/tests/
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
-**说明**: releases 为主表，版本通过 tag_name 与 assets 关联（非外键）
+**说明**: releases 的 `all_package_names` 和 `total_downloads` 字段是通过 SQL 查询动态计算的虚拟字段，不存在于数据表中。
 
 #### assets (下载文件表)
 | 字段 | 类型 | 说明 |
@@ -348,7 +355,7 @@ e2e/tests/
 | file_path | TEXT NOT NULL | 文件路径 |
 | created_at | DATETIME | 创建时间 |
 
-**说明**: assets 通过文件名中的版本号（tag_name）匹配关联到 releases
+**说明**: assets 通过 `package_id` 关联 `packages`，`packages.releases_id` 关联 `releases`
 
 #### jenkins_configs (Jenkins配置表)
 | 字段 | 类型 | 说明 |
@@ -394,9 +401,7 @@ users (无外键)
 packages (1) ←→ (N) assets
 packages (1) ←→ (N) jenkins_configs
 packages (1) ←→ (N) build_packages
-releases ←→ (N) assets (通过 tag_name 匹配，非外键)
+packages (N) ←→ (1) releases (通过 releases_id 关联)
 releases (1) ←→ (N) unified_session_id (同一统一发版)
 build_sessions (1) ←→ (N) build_packages
 ```
-
-**说明**: releases 与 assets 通过文件名中的版本号 tag_name 关联（软关联），非数据库外键约束。
