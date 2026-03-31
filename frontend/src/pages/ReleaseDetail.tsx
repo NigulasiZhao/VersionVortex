@@ -142,7 +142,7 @@ export default function ReleaseDetail() {
       {/* Content */}
       <div className="relative z-10">
         {/* Back */}
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-[var(--color-fg-muted)] hover:text-[#6C3FF5] mb-6 no-underline transition-colors animate-fade-in">
+        <Link to="/" state={{ fromDetail: true }} className="inline-flex items-center gap-1 text-sm text-[var(--color-fg-muted)] hover:text-[#6C3FF5] mb-6 no-underline transition-colors animate-fade-in">
           <ArrowLeft className="w-4 h-4" />
           返回版本列表
         </Link>

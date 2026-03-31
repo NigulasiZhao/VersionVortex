@@ -25,6 +25,7 @@ export default function Home() {
   const [scrollRestored, setScrollRestored] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const initialized = useRef(false);
 
   // Check if returning from detail page (use cache) or fresh load (fetch API)
   const isReturningFromDetail = location.state?.fromDetail === true;
@@ -48,12 +49,40 @@ export default function Home() {
       filters.endDate = dateRange.end;
     }
     return getReleases(filters).then((result) => {
+      if (!result) throw new Error('API returned no data');
       if (append) {
-        setReleases(prev => [...prev, ...result.releases]);
+        setReleases(prev => {
+          const newReleases = [...prev, ...(result.releases || [])];
+          // Update cache with merged releases
+          try {
+            const cached = sessionStorage.getItem('home-cache');
+            const cachedData = cached ? JSON.parse(cached) : {};
+            sessionStorage.setItem('home-cache', JSON.stringify({
+              ...cachedData,
+              releases: newReleases,
+              page: result.pagination.page,
+              total: result.pagination.total,
+              hasMore: result.pagination.page < result.pagination.totalPages
+            }));
+          } catch {}
+          return newReleases;
+        });
       } else {
-        setReleases(result.releases);
+        setReleases(result.releases || []);
+        // Update cache with new filtered data
+        try {
+          const cached = sessionStorage.getItem('home-cache');
+          const cachedData = cached ? JSON.parse(cached) : {};
+          sessionStorage.setItem('home-cache', JSON.stringify({
+            ...cachedData,
+            releases: result.releases || [],
+            page: result.pagination.page,
+            total: result.pagination.total,
+            hasMore: result.pagination.page < result.pagination.totalPages
+          }));
+        } catch {}
       }
-      setHasMore(result.pagination.page < result.pagination.totalPages);
+      setHasMore(result.pagination ? result.pagination.page < result.pagination.totalPages : false);
       return result;
     });
   }, [selectedPackage, searchQuery, dateRange]);
@@ -61,16 +90,28 @@ export default function Home() {
   // Initial data loading - only use cache when returning from detail page
   useEffect(() => {
     if (isReturningFromDetail) {
-      // Use cache when returning from detail page
       const cachedData = sessionStorage.getItem('home-cache');
+      const savedPosition = sessionStorage.getItem('home-scroll-position');
+
       if (cachedData) {
         try {
-          const { releases: r, packages: p, stats: s } = JSON.parse(cachedData);
-          setReleases(r);
-          setPackages(p);
+          const { releases: r, packages: p, stats: s, page: cachedPage, hasMore: cachedHasMore } = JSON.parse(cachedData);
+          setReleases(r || []);
+          setPackages(p || []);
           setStats(s);
+          setPage(cachedPage || 1);
+          setHasMore(cachedHasMore !== undefined ? cachedHasMore : true);
+
+          // Wait for DOM to update, then restore scroll position
+          requestAnimationFrame(() => {
+            if (savedPosition) {
+              window.scrollTo(0, parseFloat(savedPosition));
+              sessionStorage.removeItem('home-scroll-position');
+            }
+          });
           setLoading(false);
-          return; // Use cache, don't fetch
+
+          return;
         } catch {
           // Cache invalid, fall through to fetch
         }
@@ -86,7 +127,13 @@ export default function Home() {
         setHasMore(rResult.pagination.page < rResult.pagination.totalPages);
         setPage(1);
         // Cache the data for detail page returns
-        sessionStorage.setItem('home-cache', JSON.stringify({ releases: rResult.releases, packages: p, stats: s }));
+        sessionStorage.setItem('home-cache', JSON.stringify({
+          releases: rResult.releases,
+          packages: p,
+          stats: s,
+          page: 1,
+          hasMore: rResult.pagination.page < rResult.pagination.totalPages
+        }));
       })
       .finally(() => setLoading(false));
   }, [isReturningFromDetail]);
@@ -94,21 +141,53 @@ export default function Home() {
   // Refetch releases when filters change
   useEffect(() => {
     if (!loading) {
+      // Skip on initial mount and when returning from detail page - only trigger when filters actually change
+      if (!initialized.current || isReturningFromDetail) {
+        initialized.current = true;
+        return;
+      }
       setLoadingMore(true);
-      fetchReleases(1, false).finally(() => {
+      fetchReleases(1, false).then((result) => {
+        // Update cache with new filtered data
+        if (result?.releases) {
+          const cached = sessionStorage.getItem('home-cache');
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              sessionStorage.setItem('home-cache', JSON.stringify({
+                ...parsed,
+                releases: result.releases
+              }));
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }).finally(() => {
         setLoadingMore(false);
         setPage(1);
       });
     }
-  }, [fetchReleases, loading]);
+  }, [fetchReleases, loading, isReturningFromDetail]);
 
   // Load more when reaching bottom
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     const nextPage = page + 1;
-    fetchReleases(nextPage, true).then(() => {
+    fetchReleases(nextPage, true).then((result) => {
       setPage(nextPage);
+      // Update cache with new page number
+      try {
+        const cached = sessionStorage.getItem('home-cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          sessionStorage.setItem('home-cache', JSON.stringify({
+            ...parsed,
+            page: nextPage
+          }));
+        }
+      } catch {}
     }).finally(() => {
       setLoadingMore(false);
     });
@@ -154,18 +233,6 @@ export default function Home() {
     setSearchText("");
     setSearchQuery("");
   };
-
-  // Restore scroll position when returning from detail page
-  useLayoutEffect(() => {
-    if (loading) return;
-
-    const savedPosition = sessionStorage.getItem('home-scroll-position');
-    if (savedPosition) {
-      window.scrollTo(0, parseFloat(savedPosition));
-      sessionStorage.removeItem('home-scroll-position');
-      setScrollRestored(true);
-    }
-  }, [loading]);
 
   // Smooth fade-in when data loads
   const [visible, setVisible] = useState(false);

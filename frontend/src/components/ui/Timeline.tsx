@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Download, Search, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -140,6 +141,8 @@ function ReleaseCard({ release, isLatest, packageAliasMap }) {
     <Link
       to={`/releases/${release.tag_name}`}
       onClick={handleClick}
+      data-release-card
+      data-tag-name={release.tag_name}
       className={`block border rounded-xl transition-all duration-300 hover:border-[#6C3FF5] group ${
         isUnified ? 'p-5' : 'p-4'
       }`}
@@ -240,7 +243,7 @@ function ReleaseCard({ release, isLatest, packageAliasMap }) {
   );
 }
 
-export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage, dateRange, setDateRange, searchText, setSearchText, onSearchKeyDown, onClearSearch, loadingMore, hasMore, loadMoreRef }) {
+export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage, dateRange, setDateRange, searchText, setSearchText, onSearchKeyDown, onClearSearch, loadingMore, hasMore, loadMoreRef, onVisibleReleaseChange }) {
   // Create a map from package name to alias for quick lookup
   const packageAliasMap = {};
   packages.forEach((pkg) => {
@@ -251,6 +254,28 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
   const getPackageLabel = (pkg) => pkg.alias || pkg.name;
 
   const monthGroups = groupByMonth(releases);
+
+  // Track first visible release for scroll restoration
+  useEffect(() => {
+    const handleScroll = () => {
+      // Find the first visible release card
+      const cards = document.querySelectorAll('[data-release-card]');
+      for (const card of cards) {
+        const rect = card.getBoundingClientRect();
+        if (rect.top >= 0 && rect.top < window.innerHeight * 0.5) {
+          const tagName = card.getAttribute('data-tag-name');
+          if (tagName) {
+            sessionStorage.setItem('home-visible-release', tagName);
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Initial call
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [releases]);
 
   // Prepare dropdown options (show alias in dropdown if available)
   const dropdownOptions = [
