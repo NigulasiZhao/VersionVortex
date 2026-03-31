@@ -4,6 +4,7 @@ import { getRelease, downloadAsset, getPackages } from '../services/api';
 import type { Release, Package } from '../types';
 import { ArrowLeft, Download, ExternalLink, Folder } from 'lucide-react';
 import { TreeView, TreeNode } from '../components/ui/tree-view';
+import { ArkCheckbox } from '../components/ui/checkbox-1';
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B';
@@ -206,11 +207,9 @@ export default function ReleaseDetail() {
             <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden sticky top-4 animate-slide-in-right">
               <div className="px-5 py-3 border-b border-[var(--color-border-default)] flex items-center justify-between min-h-[52px]" style={{ background: 'var(--color-canvas-subtle)' }}>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <ArkCheckbox
                     checked={release.assets?.length > 0 && selectedAssets.size === release.assets?.length}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-[var(--color-border-default)] text-[#6C3FF5] focus:ring-[#6C3FF5]"
                   />
                   <h3 className="text-sm font-semibold text-[var(--color-fg-default)] flex items-center gap-2">
                     <Download className="w-4 h-4" style={{ color: '#6C3FF5' }} />

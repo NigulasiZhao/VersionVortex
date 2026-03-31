@@ -5,6 +5,7 @@ import { ChevronRight, Folder, File, FolderOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Download } from "lucide-react";
+import { ArkCheckbox } from "./checkbox-1";
 
 export type TreeNode = {
   id: string;
@@ -135,50 +136,59 @@ export function TreeView({
           )}
           style={{ paddingLeft: level * indent + 8 }}
           onClick={(e) => {
+            const target = e.target as HTMLElement;
+            // If clicking expand area, only toggle expand
+            if (target.closest('.expand-area')) {
+              return;
+            }
+            // If clicking checkbox wrapper, let checkbox handle it
+            if (target.closest('.checkbox-wrapper')) {
+              return;
+            }
+            // For asset rows, toggle selection
+            if (isAssetNode && assetId !== null) {
+              const newSelected = new Set(selectedAssets || []);
+              if (newSelected.has(assetId)) {
+                newSelected.delete(assetId);
+              } else {
+                newSelected.add(assetId);
+              }
+              onSelectionChange?.(Array.from(newSelected).map(id => `asset-${id}`));
+              return;
+            }
+            // For folder nodes, toggle expand and selection
             if (hasChildren) {
               toggleExpanded(node.id);
               handleSelection(node.id, e.ctrlKey || e.metaKey);
-            } else if (isAssetNode) {
-              // Toggle checkbox for asset nodes
-              const newSelected = new Set(selectedAssets || []);
-              if (assetId !== null) {
-                if (newSelected.has(assetId)) {
-                  newSelected.delete(assetId);
-                } else {
-                  newSelected.add(assetId);
-                }
-                onSelectionChange?.(Array.from(newSelected).map(id => `asset-${id}`));
-              }
             }
           }}
           whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
         >
           {/* Expand Icon */}
           <motion.div
-            className="flex items-center justify-center w-4 h-4 mr-2"
+            className="expand-area flex items-center justify-center w-6 h-6 mr-1 cursor-pointer"
             animate={{ rotate: hasChildren && isExpanded ? 90 : 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
           >
             {hasChildren ? (
               <ChevronRight className="h-3 w-3 text-[var(--color-fg-muted)]" />
             ) : isAssetNode ? (
-              <input
-                type="checkbox"
-                checked={isAssetSelected || false}
-                onChange={() => {
-                  const newSelected = new Set(selectedAssets || []);
-                  if (assetId !== null) {
-                    if (newSelected.has(assetId)) {
-                      newSelected.delete(assetId);
-                    } else {
-                      newSelected.add(assetId);
+              <div className="checkbox-wrapper">
+                <ArkCheckbox
+                  checked={isAssetSelected || false}
+                  onChange={(checked) => {
+                    const newSelected = new Set(selectedAssets || []);
+                    if (assetId !== null) {
+                      if (checked) {
+                        newSelected.add(assetId);
+                      } else {
+                        newSelected.delete(assetId);
+                      }
+                      onSelectionChange?.(Array.from(newSelected).map(id => `asset-${id}`));
                     }
-                    onSelectionChange?.(Array.from(newSelected).map(id => `asset-${id}`));
-                  }
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className="w-4 h-4 rounded border-[var(--color-border-default)] text-[#6C3FF5] focus:ring-[#6C3FF5]"
-              />
+                  }}
+                />
+              </div>
             ) : null}
           </motion.div>
 
