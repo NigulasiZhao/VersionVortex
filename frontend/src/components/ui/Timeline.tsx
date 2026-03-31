@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Download } from "lucide-react";
+import { Download, Search, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FluidDropdown } from "./FluidDropdown";
 import { DateRangePicker, type DateRange } from "./DateRangePicker";
@@ -240,7 +240,7 @@ function ReleaseCard({ release, isLatest, packageAliasMap }) {
   );
 }
 
-export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage, dateRange, setDateRange }) {
+export function Timeline({ releases, packages, className = "", selectedPackage, setSelectedPackage, dateRange, setDateRange, searchText, setSearchText, onSearchKeyDown, onClearSearch }) {
   // Create a map from package name to alias for quick lookup
   const packageAliasMap = {};
   packages.forEach((pkg) => {
@@ -250,34 +250,7 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
   // Get display name for dropdown options (show alias if available)
   const getPackageLabel = (pkg) => pkg.alias || pkg.name;
 
-  const filteredReleases =
-    releases.filter((r) => {
-      // Package filter
-      if (selectedPackage !== "all") {
-        const selectedAlias = packageAliasMap[selectedPackage] || selectedPackage;
-        const allNames = r.all_package_names || r.package_name;
-        if (!allNames || !allNames.split(',').includes(selectedAlias)) {
-          return false;
-        }
-      }
-      // Date range filter
-      if (dateRange?.start || dateRange?.end) {
-        const releaseDate = new Date(r.created_at);
-        if (dateRange.start) {
-          const start = new Date(dateRange.start);
-          start.setHours(0, 0, 0, 0);
-          if (releaseDate < start) return false;
-        }
-        if (dateRange.end) {
-          const end = new Date(dateRange.end);
-          end.setHours(23, 59, 59, 999);
-          if (releaseDate > end) return false;
-        }
-      }
-      return true;
-    });
-
-  const monthGroups = groupByMonth(filteredReleases);
+  const monthGroups = groupByMonth(releases);
 
   // Prepare dropdown options (show alias in dropdown if available)
   const dropdownOptions = [
@@ -297,11 +270,35 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
           value={dateRange}
           onChange={setDateRange}
         />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--color-fg-muted)" }} />
+          <input
+            type="text"
+            placeholder="搜索版本号、包名..."
+            value={searchText || ""}
+            onChange={(e) => setSearchText(e.target.value)}
+            onKeyDown={onSearchKeyDown}
+            className="h-9 pl-9 pr-8 rounded-lg border text-sm w-[180px] placeholder:text-[var(--color-fg-muted)]"
+            style={{
+              background: "var(--color-canvas-subtle)",
+              borderColor: searchText ? "#6C3FF5" : "var(--color-border-default)",
+              color: "var(--color-fg-default)",
+            }}
+          />
+          {searchText && (
+            <button
+              onClick={onClearSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-black/5"
+            >
+              <X className="w-3 h-3" style={{ color: "var(--color-fg-muted)" }} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-4">
         <AnimatePresence mode="popLayout">
-        {filteredReleases.length === 0 ? (
+        {releases.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

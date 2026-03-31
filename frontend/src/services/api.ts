@@ -29,7 +29,29 @@ api.interceptors.response.use(
 );
 
 // Public APIs
-export const getReleases = (pkg?: string) => api.get('/releases', { params: pkg && pkg !== 'all' ? { package: pkg } : {} }).then((r) => r.data);
+export interface ReleaseFilters {
+  package?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export const getReleases = (filters?: ReleaseFilters) => {
+  const params: Record<string, string> = {};
+  if (filters?.package && filters.package !== 'all') {
+    params.package = filters.package;
+  }
+  if (filters?.search) {
+    params.search = filters.search;
+  }
+  if (filters?.startDate) {
+    params.startDate = filters.startDate;
+  }
+  if (filters?.endDate) {
+    params.endDate = filters.endDate;
+  }
+  return api.get('/releases', { params }).then((r) => r.data);
+};
 export const getRelease = (tag: string) => api.get(`/releases/${tag}`).then((r) => r.data);
 export const getPackages = () => api.get('/packages').then((r) => r.data);
 export const getPackageReleases = (name: string) => api.get(`/packages/${name}/releases`).then((r) => r.data);

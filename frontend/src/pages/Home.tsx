@@ -1,6 +1,6 @@
-import { useState, useEffect, useLayoutEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import { getReleases, getPackages, getStats } from "../services/api";
+import { getReleases, getPackages, getStats, type ReleaseFilters } from "../services/api";
 import type { Release, Package } from "../types";
 import { Timeline } from "../components/ui/Timeline";
 import type { DateRange } from "../components/ui/DateRangePicker";
@@ -14,11 +14,31 @@ export default function Home() {
   const [stats, setStats] = useState<any>(null);
   const [selectedPackage, setSelectedPackage] = useState<string>(packageName || "all");
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); // Confirmed search query (on Enter)
   const [loading, setLoading] = useState(true);
   const [scrollRestored, setScrollRestored] = useState(false);
 
   // Check if returning from detail page (use cache) or fresh load (fetch API)
   const isReturningFromDetail = location.state?.fromDetail === true;
+
+  // Fetch releases with current filters
+  const fetchReleases = useCallback(() => {
+    const filters: ReleaseFilters = {};
+    if (selectedPackage !== "all") {
+      filters.package = selectedPackage;
+    }
+    if (searchQuery) {
+      filters.search = searchQuery;
+    }
+    if (dateRange?.start) {
+      filters.startDate = dateRange.start;
+    }
+    if (dateRange?.end) {
+      filters.endDate = dateRange.end;
+    }
+    return getReleases(filters);
+  }, [selectedPackage, searchQuery, dateRange]);
 
   // Data loading - only use cache when returning from detail page
   useEffect(() => {
@@ -51,12 +71,25 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, [isReturningFromDetail]);
 
-  // Refetch releases when package filter changes (don't show loading, just update when data arrives)
+  // Refetch releases when filters change
   useEffect(() => {
-    if (!loading && selectedPackage !== undefined) {
-      getReleases(selectedPackage).then((r) => setReleases(r));
+    if (!loading) {
+      fetchReleases().then((r) => setReleases(r));
     }
-  }, [selectedPackage]);
+  }, [fetchReleases, loading]);
+
+  // Handle search on Enter key
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      setSearchQuery(searchText);
+    }
+  };
+
+  // Handle clear search
+  const handleClearSearch = () => {
+    setSearchText("");
+    setSearchQuery("");
+  };
 
   // Restore scroll position when returning from detail page
   useLayoutEffect(() => {
@@ -168,7 +201,7 @@ export default function Home() {
             <p style={{ color: "var(--color-fg-muted)" }}>暂无版本</p>
           </div>
         ) : (
-          <Timeline releases={releases} packages={packages} selectedPackage={selectedPackage} setSelectedPackage={setSelectedPackage} dateRange={dateRange} setDateRange={setDateRange} />
+          <Timeline releases={releases} packages={packages} selectedPackage={selectedPackage} setSelectedPackage={setSelectedPackage} dateRange={dateRange} setDateRange={setDateRange} searchText={searchText} setSearchText={setSearchText} onSearchKeyDown={handleSearchKeyDown} onClearSearch={handleClearSearch} />
         )}
       </div>
     </div>

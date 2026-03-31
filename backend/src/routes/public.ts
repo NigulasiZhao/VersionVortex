@@ -3,10 +3,14 @@ import { getDb } from '../db/index';
 
 const router = Router();
 
-// GET /api/releases - Get all published releases (optional ?package=filter by package name)
+// GET /api/releases - Get all published releases with optional filters
 router.get('/releases', (req: Request, res: Response) => {
   try {
     const packageFilter = req.query.package as string | undefined;
+    const search = req.query.search as string | undefined;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+
     let query = `
       SELECT r.*,
         (SELECT COUNT(*) FROM assets a JOIN packages p ON a.package_id = p.id WHERE a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%') as asset_count,
@@ -17,30 +21,52 @@ router.get('/releases', (req: Request, res: Response) => {
     `;
     const params: any[] = [];
 
+    // Package filter
     if (packageFilter && packageFilter !== 'all') {
-      // Filter by package: find packages with this name that have assets matching the release tag
       query += ` AND EXISTS (SELECT 1 FROM packages p WHERE p.name = ? AND EXISTS (SELECT 1 FROM assets a WHERE a.package_id = p.id AND a.name LIKE '%' || REPLACE(r.tag_name, 'v', '') || '%'))`;
       params.push(packageFilter);
+    }
+
+    // Date range filter
+    if (startDate) {
+      query += ` AND DATE(r.created_at) >= DATE(?)`;
+      params.push(startDate);
+    }
+    if (endDate) {
+      query += ` AND DATE(r.created_at) <= DATE(?)`;
+      params.push(endDate);
     }
 
     query += ` ORDER BY r.created_at DESC`;
 
     const releases = getDb().prepare(query).all(...params);
 
-    // Attach package info to each release
-    for (const release of releases) {
+    // Attach package info and apply search filter
+    const filteredReleases = releases.filter((release: any) => {
+      // Attach package info
       const packages = getDb().prepare(`
         SELECT p.name as package_name, p.description as package_description, p.alias
         FROM packages p
         WHERE p.releases_id = ?
-      `).all((release as any).id);
+      `).all(release.id);
       if (packages.length > 0) {
-        (release as any).package_name = packages[0].package_name;
-        (release as any).package_description = packages[0].package_description;
+        release.package_name = packages[0].package_name;
+        release.package_description = packages[0].package_description;
       }
-    }
 
-    res.json(releases);
+      // Search filter (fuzzy match on tag_name, title, body, all_package_names)
+      if (search) {
+        const searchLower = search.toLowerCase();
+        const tagMatch = release.tag_name?.toLowerCase().includes(searchLower);
+        const titleMatch = release.title?.toLowerCase().includes(searchLower);
+        const bodyMatch = release.body?.toLowerCase().includes(searchLower);
+        const pkgMatch = release.all_package_names?.toLowerCase().includes(searchLower);
+        return tagMatch || titleMatch || bodyMatch || pkgMatch;
+      }
+      return true;
+    });
+
+    res.json(filteredReleases);
   } catch (err) {
     res.status(500).json({ error: '获取版本列表失败' });
   }
