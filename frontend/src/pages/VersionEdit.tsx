@@ -128,14 +128,14 @@ export default function VersionEdit() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-canvas-default)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'transparent' }}>
         <div className="animate-spin w-8 h-8 border-2 border-[#6C3FF5] border-t-transparent rounded-full" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-canvas-default)' }}>
+    <div className="min-h-screen" style={{ background: 'transparent' }}>
       {/* 删除确认对话框 */}
       <SimpleDialog
         open={deleteDialogOpen}
@@ -160,7 +160,7 @@ export default function VersionEdit() {
       </SimpleDialog>
 
       {/* Header */}
-      <header className="border-b border-[var(--color-border-default)]" style={{ background: 'var(--color-canvas-default)' }}>
+      <header className="border-b border-[var(--color-border-default)]" style={{ background: 'transparent' }}>
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center gap-4">
           <Link to="/admin" className="text-[var(--color-fg-muted)] hover:text-[#6C3FF5] no-underline flex items-center gap-1 transition-colors">
             <ArrowLeft className="w-4 h-4" />

@@ -561,14 +561,14 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-canvas-default)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'transparent' }}>
         <div className="animate-spin w-8 h-8 border-2 border-[var(--color-accent-emphasis)] border-t-transparent rounded-full" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-canvas-default)' }}>
+    <div className="min-h-screen" style={{ background: 'transparent' }}>
       {/* 删除确认弹框 */}
       <SimpleDialog
         open={!!deleteConfirm}
@@ -617,7 +617,7 @@ export default function AdminDashboard() {
               { label: '下载次数', value: Number(stats.totalDownloads).toLocaleString(), color: '#6C3FF5' },
               { label: '产物总数', value: stats.totalAssets, color: '#57606a' },
             ].map((stat) => (
-              <div key={stat.label} className="border border-[var(--color-border-default)] rounded-xl p-4" style={{ background: 'var(--color-canvas-subtle)' }}>
+              <div key={stat.label} className="border border-[var(--color-border-default)] rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(8px)' }}>
                 <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
                 <div className="text-xs text-[var(--color-fg-muted)] mt-1">{stat.label}</div>
               </div>
@@ -662,7 +662,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Table */}
-        <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden" style={{ background: 'var(--color-canvas-subtle)' }}>
+        <div className="border border-[var(--color-border-default)] rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(8px)' }}>
           {tab === 'releases' ? (
             <ReleasesTable
               releases={releases}

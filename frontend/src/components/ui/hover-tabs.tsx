@@ -53,7 +53,7 @@ interface HoverTabsProps {
 
 export function HoverTabs({ activeTab, onTabChange }: HoverTabsProps): React.JSX.Element {
   return (
-    <div className="flex flex-nowrap items-center gap-1 p-1 rounded-xl bg-[var(--color-canvas-subtle)] border border-[var(--color-border-default)] w-auto overflow-hidden">
+    <div className="flex flex-nowrap items-center gap-1 p-1 rounded-xl border border-[var(--color-border-default)] w-auto overflow-hidden" style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(8px)' }}>
       {tabs.map((item) => (
         <motion.div
           key={item.id}
