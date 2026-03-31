@@ -323,7 +323,10 @@ export function Timeline({ releases, packages, className = "", selectedPackage, 
         </div>
       </div>
 
-      <div className="mt-4">
+      {/* Divider between filters and timeline */}
+      <div className="h-px my-4" style={{ background: 'var(--color-border-default)' }} />
+
+      <div>
         <AnimatePresence mode="popLayout">
         {releases.length === 0 ? (
           <motion.div
